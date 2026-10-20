@@ -25,6 +25,9 @@ node.
   This shows up as the load generator itself falling behind its schedule by as much as the maximum
   latency, and it dominates p99.9 and above. These numbers are reported as they are, not filtered
   out (RESULTS §3).
+- **Verified on Linux** (RESULTS §8). In a Linux container, the kernel's `Cpus_allowed_list`
+  confirms the journal and matching threads are pinned. Pinning them cut p99.9 by about 2.6× at
+  100k commands/s, measured in a VM, so this is vCPU pinning.
 - **Production setup:** pinning matters only together with `isolcpus`/`nohz_full` kernel isolation,
-  IRQ affinity, and turning off frequency scaling. None of that is possible on the laptop or in Docker
-  Desktop, so this project does not claim pinned-core numbers.
+  IRQ affinity, and turning off frequency scaling. None of that is possible on the laptop or in a desktop
+  Docker VM, so this project claims no bare-metal pinned-core numbers.

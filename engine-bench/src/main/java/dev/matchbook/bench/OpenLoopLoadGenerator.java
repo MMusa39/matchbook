@@ -46,7 +46,8 @@ public final class OpenLoopLoadGenerator {
 
     record Options(long rate, int durationSeconds, int warmupSeconds, WaitStrategyType waitStrategy,
                    WaitStrategyType outboundWait, FsyncPolicy fsync,
-                   boolean pooling, boolean pretouch, String label, Path output, Path dataDirectory) {
+                   boolean pooling, boolean pretouch, String label, Path output, Path dataDirectory,
+                   int journalCpu, int matchingCpu) {
 
         static Options parse(String[] args) {
             Map<String, String> m = new LinkedHashMap<>();
@@ -64,7 +65,9 @@ public final class OpenLoopLoadGenerator {
                     Boolean.parseBoolean(m.getOrDefault("pretouch", "true")),
                     m.getOrDefault("label", "run"),
                     Path.of(m.getOrDefault("out", "docs/results/loadgen")),
-                    Path.of(m.getOrDefault("data", System.getProperty("java.io.tmpdir") + "/matchbook-loadgen")));
+                    Path.of(m.getOrDefault("data", System.getProperty("java.io.tmpdir") + "/matchbook-loadgen")),
+                    Integer.parseInt(m.getOrDefault("journal-cpu", "-1")),
+                    Integer.parseInt(m.getOrDefault("matching-cpu", "-1")));
         }
     }
 
@@ -100,7 +103,8 @@ public final class OpenLoopLoadGenerator {
                 .withProducer(false)
                 .withFsync(o.fsync())
                 .withJournalSegmentBytes(1L << 30)
-                .withPretouchJournal(o.pretouch());
+                .withPretouchJournal(o.pretouch())
+                .withCpus(o.journalCpu(), o.matchingCpu());
         LatencyListener listener = new LatencyListener();
         EnginePipeline pipeline = EnginePipeline.start(config, List.of(listener));
 
@@ -157,14 +161,15 @@ public final class OpenLoopLoadGenerator {
             listener.responseTime.outputPercentileDistribution(out, 1000.0);
         }
         String summary = String.format(
-                "label=%s rate=%d/s achieved=%.0f/s duration=%ds wait=%s/%s fsync=%s pooling=%s pretouch=%s gc=%s%n"
+                "label=%s rate=%d/s achieved=%.0f/s duration=%ds wait=%s/%s fsync=%s pooling=%s pretouch=%s cpus=%d/%d gc=%s%n"
                         + "  response time (from intended send, CO-corrected) us: p50=%.2f p90=%.2f p99=%.2f p99.9=%.2f p99.99=%.2f max=%.2f n=%d%n"
                         + "  service time  (from actual send, naive)          us: p50=%.2f p90=%.2f p99=%.2f p99.9=%.2f p99.99=%.2f max=%.2f%n"
                         + "  producer max lag behind schedule: %.2f us; gc during measurement: %d collections, %d ms; "
                         + "process cpu: %.2f cores%n"
                         + "  publish: max %.2f us, blocked on full ring %.1f ms total; max ring depth inbound %d, outbound %d%n",
                 o.label(), o.rate(), listener.responseTime.getTotalCount() / measuredSeconds, o.durationSeconds(),
-                o.waitStrategy(), o.outboundWait(), o.fsync(), o.pooling(), o.pretouch(), gcNames(),
+                o.waitStrategy(), o.outboundWait(), o.fsync(), o.pooling(), o.pretouch(), o.journalCpu(),
+                o.matchingCpu(), gcNames(),
                 us(listener.responseTime, 50), us(listener.responseTime, 90), us(listener.responseTime, 99),
                 us(listener.responseTime, 99.9), us(listener.responseTime, 99.99),
                 listener.responseTime.getMaxValue() / 1000.0, listener.responseTime.getTotalCount(),

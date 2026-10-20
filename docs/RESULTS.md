@@ -414,3 +414,36 @@ journal, matching and publisher, ideally pinned on one socket. On this laptop th
 server, shards are sized to the cores available. A real venue also does not run its shards at
 saturation: §3 shows a single shard handles 1 M commands/s with p99 51 µs, and that is the operating
 point that matters.
+
+## 8. Linux: CPU pinning
+
+macOS cannot pin threads (ADR-0009), so the pinning path was exercised in Linux instead: the
+`eclipse-temurin:25-jre-noble` container, inside the Colima VM with 4 vCPUs.
+
+**It works.** With `--journal-cpu 2 --matching-cpu 3`, OpenHFT Affinity logs `journal-0 pinned to
+CPU 2` and `matching-0 pinned to CPU 3`, and the kernel agrees. `/proc/<pid>/task/*/status` shows
+`Cpus_allowed_list=2` for `journal-0` and `3` for `matching-0`, while the unpinned listener thread
+keeps `0-3`.
+
+**Latency, pinned vs unpinned.** 100k commands/s, `BUSY_SPIN` inbound and `YIELDING` outbound,
+3 interleaved runs each, 10 s warm-up and 20 s measured.
+
+```bash
+docker run --rm -v "$PWD/engine-bench/target/benchmarks.jar":/b.jar:ro -v "$PWD/docs/results/loadgen-linux":/out \
+  eclipse-temurin:25-jre-noble java -Xms1g -Xmx1g -XX:+AlwaysPreTouch -cp /b.jar dev.matchbook.bench.OpenLoopLoadGenerator \
+  --rate 100000 --duration 20 --warmup 10 --wait BUSY_SPIN --outbound-wait YIELDING [--journal-cpu 2 --matching-cpu 3] \
+  --label linux-<mode>-rN --out /out
+```
+
+| threads | p50 µs | p90 µs | p99 µs | p99.9 µs | p99.99 µs | max µs |
+|---|---|---|---|---|---|---|
+| unpinned | 0.86 [0.82–0.86] | 1.21 [1.16–1.23] | 31.2 [24.9–41.1] | 6595 [2626–10134] | 17187 [13345–20562] | 19055 [15131–22151] |
+| journal → CPU 2, matching → CPU 3 | 0.85 [0.85–0.88] | 1.19 [1.17–1.21] | 24.0 [22.2–25.2] | 2499 [1631–2839] | 7946 [6357–9101] | 9372 [8180–10772] |
+
+- **The effect:** pinning the two inbound stages lowered p99 (24 µs vs 31 µs), cut p99.9 by about
+  2.6× (2.5 ms vs 6.6 ms), and tightened the run-to-run spread considerably.
+- **The caveat:** this is pinning to a vCPU, and macOS still schedules the VM's vCPUs onto its own
+  cores. It shows the mechanism and its direction, not bare-metal numbers.
+- **Medians:** these are higher than on macOS (0.85 µs vs 0.75 µs), as expected for a VM.
+
+Raw: [`results/loadgen-linux/`](results/loadgen-linux/).

@@ -1,0 +1,5 @@
+label=linux-pinned-r1 rate=100000/s achieved=100000/s duration=20s wait=BUSY_SPIN/YIELDING fsync=NONE pooling=true pretouch=true cpus=2/3 gc=G1_Young_Generation+G1_Concurrent_GC+G1_Old_Generation
+  response time (from intended send, CO-corrected) us: p50=0.85 p90=1.19 p99=25.25 p99.9=2838.53 p99.99=9101.31 max=10772.48 n=2000000
+  service time  (from actual send, naive)          us: p50=0.83 p90=1.17 p99=18.05 p99.9=1498.11 p99.99=4403.20 max=4481.02
+  producer max lag behind schedule: 10705.44 us; gc during measurement: 0 collections, 0 ms; process cpu: 4.00 cores
+  publish: max 3422.45 us, blocked on full ring 22.9 ms total; max ring depth inbound 2024, outbound 3050
