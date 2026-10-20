@@ -1,0 +1,83 @@
+{{- $root := . -}}
+{{- range $name, $spec := dict
+    "gateway" (dict "port" 8080 "extraPort" 9091 "values" .Values.gateway)
+    "marketdata" (dict "port" 8081 "extraPort" 0 "values" .Values.marketdata)
+    "posttrade" (dict "port" 8082 "extraPort" 0 "values" .Values.posttrade) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels: {{- include "matchbook.labels" $root | nindent 4 }}
+spec:
+  selector: { app: {{ $root.Release.Name }}-{{ $name }} }
+  ports:
+    - { name: http, port: {{ $spec.port }}, targetPort: {{ $spec.port }} }
+    {{- if $spec.extraPort }}
+    - { name: grpc, port: {{ $spec.extraPort }}, targetPort: {{ $spec.extraPort }} }
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels: {{- include "matchbook.labels" $root | nindent 4 }}
+spec:
+  replicas: {{ $spec.values.replicas }}
+  selector:
+    matchLabels: { app: {{ $root.Release.Name }}-{{ $name }} }
+  template:
+    metadata:
+      labels: { app: {{ $root.Release.Name }}-{{ $name }} }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ $spec.port | quote }}
+        prometheus.io/path: /actuator/prometheus
+    spec:
+      securityContext: { runAsUser: 10001, runAsNonRoot: true }
+      containers:
+        - name: {{ $name }}
+          image: {{ include "matchbook.image" (dict "root" $root "name" $name) }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          env:
+            {{- include "matchbook.commonEnv" $root | nindent 12 }}
+            - { name: JAVA_TOOL_OPTIONS, value: "-Xmx{{ $spec.values.heap }}" }
+            - { name: ENGINE_TARGET, value: "{{ $root.Release.Name }}-engine:9090" }
+            {{- if eq $name "gateway" }}
+            - { name: REDIS_HOST, value: {{ include "matchbook.redis" $root | quote }} }
+            - { name: RATE_LIMIT_CAPACITY, value: {{ $spec.values.rateLimit.capacity | quote }} }
+            - { name: RATE_LIMIT_REFILL, value: {{ $spec.values.rateLimit.refillPerSecond | quote }} }
+            - { name: IDEMPOTENCY_TTL, value: {{ $spec.values.idempotencyTtl | quote }} }
+            {{- range $client, $digest := $root.Values.secrets.apiKeySha256 }}
+            - name: CLIENT_{{ $client }}_KEY_SHA256
+              valueFrom: { secretKeyRef: { name: {{ $root.Release.Name }}-secrets, key: api-key-{{ $client }} } }
+            {{- end }}
+            {{- end }}
+            {{- if eq $name "posttrade" }}
+            - { name: KAFKA_BOOTSTRAP_SERVERS, value: {{ include "matchbook.kafka" $root | quote }} }
+            - { name: POSTGRES_HOST, value: {{ include "matchbook.postgres" $root | quote }} }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $root.Release.Name }}-secrets, key: postgres-password } }
+            {{- end }}
+          ports:
+            - { name: http, containerPort: {{ $spec.port }} }
+            {{- if $spec.extraPort }}
+            - { name: grpc, containerPort: {{ $spec.extraPort }} }
+            {{- end }}
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 10
+          resources: {{- toYaml $spec.values.resources | nindent 12 }}
+          volumeMounts:
+            - { name: symbols, mountPath: /config, readOnly: true }
+      volumes:
+        - name: symbols
+          configMap: { name: {{ $root.Release.Name }}-symbols }
+{{- end }}

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-symbols
+  labels: {{- include "matchbook.labels" . | nindent 4 }}
+data:
+  symbols.json: |
+{{ .Files.Get "symbols.json" | indent 4 }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-secrets
+  labels: {{- include "matchbook.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  postgres-password: {{ .Values.secrets.postgresPassword | quote }}
+  {{- range $client, $digest := .Values.secrets.apiKeySha256 }}
+  api-key-{{ $client }}: {{ $digest | quote }}
+  {{- end }}

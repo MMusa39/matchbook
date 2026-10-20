@@ -1,0 +1,65 @@
+# Image coordinates. For kind, build locally and `kind load docker-image` them (see deploy/kind/README.md).
+image:
+  registry: matchbook
+  tag: local
+  pullPolicy: IfNotPresent
+
+engine:
+  replicas: 1            # one writer per shard set; the journal is not replicated (see DESIGN.md)
+  waitStrategy: SLEEPING
+  outboundWaitStrategy: BLOCKING
+  maxOrdersPerShard: "200000"
+  snapshotInterval: PT30S
+  heap: 512m
+  storage: 2Gi
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { memory: 1536Mi }
+
+gateway:
+  replicas: 1
+  heap: 256m
+  rateLimit: { capacity: "2000", refillPerSecond: "1000" }
+  idempotencyTtl: 10m     # Redis holds ~460 B per request for this long (ADR-0012)
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 768Mi }
+
+marketdata:
+  replicas: 1
+  heap: 256m
+  resources:
+    requests: { cpu: 100m, memory: 384Mi }
+    limits: { memory: 640Mi }
+
+posttrade:
+  replicas: 1
+  heap: 256m
+  resources:
+    requests: { cpu: 100m, memory: 384Mi }
+    limits: { memory: 640Mi }
+
+# API key digests (SHA-256 hex) per client id, and the Postgres password. These are LOCAL PLACEHOLDERS:
+# override with --set or an external secret manager in any real deployment.
+secrets:
+  postgresPassword: changeme-local
+  apiKeySha256:
+    "1": f4a371ea0895b3bd1900a2e5d614e8340681bef5e60d79885779d5291a9de065
+    "2": fd59e0dec717d80efa98dd444cbbc497b02fa7d21964799de445586a9bd3dbe6
+    "3": c218e938b529e9f41becfea3e2d578de3f9db79489e3d308bc2233fa1861a6d5
+
+# Development infrastructure inside the chart, so `helm install` on kind is self-contained.
+# In a real cluster, disable and point the services at managed Kafka, Redis and Postgres.
+infra:
+  enabled: true
+  kafka: { image: "apache/kafka:4.3.1", heap: 512m }
+  redis: { image: "redis:8.8.3-alpine" }
+  postgres: { image: "postgres:17.11-alpine", storage: 1Gi }
+
+# Where services send traces; empty disables trace export.
+otlpEndpoint: ""
+
+external:
+  kafkaBootstrap: ""
+  redisHost: ""
+  postgresHost: ""

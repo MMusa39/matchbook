@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-engine
+  labels: {{- include "matchbook.labels" . | nindent 4 }}
+spec:
+  selector: { app: {{ .Release.Name }}-engine }
+  ports:
+    - { name: grpc, port: 9090, targetPort: 9090 }
+    - { name: metrics, port: 9100, targetPort: 9100 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-engine
+  labels: {{- include "matchbook.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ .Release.Name }}-engine
+  replicas: {{ .Values.engine.replicas }}
+  selector:
+    matchLabels: { app: {{ .Release.Name }}-engine }
+  template:
+    metadata:
+      labels: { app: {{ .Release.Name }}-engine }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: /metrics
+    spec:
+      # Clean shutdown writes a final snapshot so the next start replays nothing.
+      terminationGracePeriodSeconds: 60
+      securityContext: { fsGroup: 10001, runAsUser: 10001, runAsNonRoot: true }
+      containers:
+        - name: engine
+          image: {{ include "matchbook.image" (dict "root" . "name" "engine") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "matchbook.commonEnv" . | nindent 12 }}
+            - { name: JAVA_TOOL_OPTIONS, value: "-Xms{{ .Values.engine.heap }} -Xmx{{ .Values.engine.heap }}" }
+            - { name: ENGINE_DATA_DIR, value: /data }
+            - { name: ENGINE_WAIT_STRATEGY, value: {{ .Values.engine.waitStrategy | quote }} }
+            - { name: ENGINE_OUTBOUND_WAIT_STRATEGY, value: {{ .Values.engine.outboundWaitStrategy | quote }} }
+            - { name: ENGINE_MAX_ORDERS_PER_SHARD, value: {{ .Values.engine.maxOrdersPerShard | quote }} }
+            - { name: ENGINE_SNAPSHOT_INTERVAL, value: {{ .Values.engine.snapshotInterval | quote }} }
+            - { name: KAFKA_BOOTSTRAP_SERVERS, value: {{ include "matchbook.kafka" . | quote }} }
+            - { name: OTEL_SERVICE_NAME, value: engine }
+          ports:
+            - { name: grpc, containerPort: 9090 }
+            - { name: metrics, containerPort: 9100 }
+          readinessProbe:
+            httpGet: { path: /health, port: metrics }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: metrics }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources: {{- toYaml .Values.engine.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: symbols, mountPath: /config, readOnly: true }
+      volumes:
+        - name: symbols
+          configMap: { name: {{ .Release.Name }}-symbols }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: {{ .Values.engine.storage }} }
