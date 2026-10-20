@@ -42,6 +42,34 @@ public class TradeProcessor {
         this.duplicates = Counter.builder("matchbook.posttrade.events").tag("result", "duplicate").register(meters);
     }
 
+    /** An engine event with its de-duplication key. */
+    public record Event<T>(T payload, int shard, long seq) {
+    }
+
+    /** Applies a batch of trades in one transaction, in order; duplicates are skipped. Returns how many were new. */
+    @Transactional
+    public int applyTrades(List<Event<Trade>> events) {
+        int applied = 0;
+        for (Event<Trade> e : events) {
+            if (applyTrade(e.payload(), e.shard(), e.seq())) {
+                applied++;
+            }
+        }
+        return applied;
+    }
+
+    /** Applies a batch of execution reports in one transaction; duplicates are skipped. Returns how many were new. */
+    @Transactional
+    public int applyExecutions(List<Event<ExecutionReport>> events) {
+        int applied = 0;
+        for (Event<ExecutionReport> e : events) {
+            if (applyExecution(e.payload(), e.shard(), e.seq())) {
+                applied++;
+            }
+        }
+        return applied;
+    }
+
     /** @return false if the event had already been applied */
     @Transactional
     public boolean applyTrade(Trade trade, int shard, long seq) {
