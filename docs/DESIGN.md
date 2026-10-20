@@ -143,14 +143,16 @@ makes the journal the engine's outbox: everything Kafka might be missing is re-s
 - **Gateway:** auth (API key → client id), then one Redis Lua call (idempotency, token bucket, internal
   id), then risk (size, notional, fat finger, position including open orders and in-flight
   reservations), then the engine (gRPC deadline + circuit breaker, no retries). The outcome is stored
-  under the client order id. Risk state comes from the engine's event stream. REST and gRPC share one
-  `OrderService`.
+  under the client order id. Risk state comes from the engine's event stream. REST, gRPC and FIX 4.4
+  (QuickFIX/J) share one `OrderService`. FIX sessions authenticate Logon by API key, and receive
+  execution reports from the engine stream, including fills of resting orders.
 - **Market data:** a replica per symbol from in-stream images plus sequenced incrementals. WebSocket
   clients get a snapshot at `n`, then exactly `n+1, n+2, …`. A gap triggers a stale notice and an
   automatic resync (ADR-0014).
 - **Post-trade:** an idempotent consumer keyed on `(shard, seq)` and positions with average-cost P&L,
-  all in one Postgres transaction with outbox inserts; a `SKIP LOCKED` relay; a DLT for poison records
-  (ADR-0013).
+  in one Postgres transaction per Kafka poll together with the outbox inserts. That is 3.7× faster to
+  drain a backlog than one transaction per record (RESULTS §6). Also a `SKIP LOCKED` relay, and a DLT
+  for poison records, which are identified by their index in the batch (ADR-0013).
 
 ## 5. Failure modes
 
@@ -160,7 +162,7 @@ makes the journal the engine's outbox: everything Kafka might be missing is re-s
 | Power loss with `FsyncPolicy.NONE` | The journal tail since the last OS writeback is lost | Recovery uses what is on disk; if the snapshot is ahead of the journal, a new journal starts after it. Use `EVERY_BATCH` (or replication) when this matters |
 | Journal damage mid-file | Start-up refuses | Operator: restore from a replica or backup |
 | Kafka down | The acked floor stops; the producer buffers, then blocks its listener; the outbound ring fills; the engine stops taking orders (`RESOURCE_EXHAUSTED`, gateway 503, circuit opens) | Kafka returns, the backlog drains. Deliberate: no trading without the drop copy |
-| Redis down | The gateway rejects all orders `503 REDIS_UNAVAILABLE` (fail closed) | Automatic when Redis returns |
+| Redis down, or full | The gateway rejects all orders `503 REDIS_UNAVAILABLE` (fail closed). A full Redis (`noeviction`) behaves the same; this was observed in a load test before the idempotency window was sized (ADR-0012) | Automatic when Redis returns, or once keys expire |
 | Engine slow or down, as seen from the gateway | Deadline exceeded → `UNKNOWN`; repeated failures open the circuit → fast `503` | Half-open probes close it |
 | Postgres down | Post-trade retries with backoff, then DLT; Kafka offsets are not committed, so nothing is lost | Redeliver or replay the DLT |
 | Slow market data client | Its bounded queue overflows; it is disconnected | Reconnect → fresh snapshot |
