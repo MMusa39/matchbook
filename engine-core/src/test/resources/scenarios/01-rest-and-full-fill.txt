@@ -1,0 +1,13 @@
+# A resting sell is fully filled by a buy priced through it. The trade prints at the resting
+# (passive) price, 100, not the aggressor's 105: price improvement goes to the aggressor.
+> NEW client=1 side=SELL px=100 qty=10
+< EXEC seq=1 NEW reason=NONE oid=1 client=1 cl=1 orig=0 sym=1 SELL LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=1
+< LEVEL seq=2 symSeq=1 sym=1 SELL px=100 qty=10 orders=1 ts=1
+< TOP seq=3 symSeq=2 sym=1 bid=0@0 ask=10@100 ts=1
+> NEW client=2 side=BUY px=105 qty=10
+< EXEC seq=4 NEW reason=NONE oid=2 client=2 cl=2 orig=0 sym=1 BUY LIMIT GTC px=105 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=2
+< TRADE seq=5 symSeq=3 trade=1 sym=1 10@100 aggressor=BUY buy=2/2 sell=1/1 ts=2
+< EXEC seq=6 FILL reason=NONE oid=1 client=1 cl=1 orig=0 sym=1 SELL LIMIT GTC px=100 qty=10 last=10@100 leaves=0 cum=10 trade=1 liq=MAKER ts=2
+< EXEC seq=7 FILL reason=NONE oid=2 client=2 cl=2 orig=0 sym=1 BUY LIMIT GTC px=105 qty=10 last=10@100 leaves=0 cum=10 trade=1 liq=TAKER ts=2
+< LEVEL seq=8 symSeq=4 sym=1 SELL px=100 qty=0 orders=0 ts=2
+< TOP seq=9 symSeq=5 sym=1 bid=0@0 ask=0@0 ts=2

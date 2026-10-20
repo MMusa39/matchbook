@@ -1,0 +1,29 @@
+# Tick 5, lot 10, quantity 10..1000, band 50..200. Every reject leaves the book untouched and
+# does not consume an order id.
+SYMBOL id=1 tick=5 lot=10 min=10 max=1000 low=50 high=200
+> NEW client=1 side=BUY px=101 qty=10
+< EXEC seq=1 REJECTED reason=INVALID_TICK_SIZE oid=0 client=1 cl=1 orig=0 sym=1 BUY LIMIT GTC px=101 qty=10 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=1
+> NEW client=1 side=BUY px=100 qty=15
+< EXEC seq=2 REJECTED reason=INVALID_LOT_SIZE oid=0 client=1 cl=2 orig=0 sym=1 BUY LIMIT GTC px=100 qty=15 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=2
+> NEW client=1 side=BUY px=100 qty=0
+< EXEC seq=3 REJECTED reason=INVALID_QUANTITY oid=0 client=1 cl=3 orig=0 sym=1 BUY LIMIT GTC px=100 qty=0 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=3
+> NEW client=1 side=BUY px=100 qty=2000
+< EXEC seq=4 REJECTED reason=INVALID_QUANTITY oid=0 client=1 cl=4 orig=0 sym=1 BUY LIMIT GTC px=100 qty=2000 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=4
+> NEW client=1 side=BUY px=45 qty=10
+< EXEC seq=5 REJECTED reason=PRICE_OUT_OF_BAND oid=0 client=1 cl=5 orig=0 sym=1 BUY LIMIT GTC px=45 qty=10 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=5
+> NEW client=1 side=BUY px=205 qty=10
+< EXEC seq=6 REJECTED reason=PRICE_OUT_OF_BAND oid=0 client=1 cl=6 orig=0 sym=1 BUY LIMIT GTC px=205 qty=10 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=6
+> NEW client=1 side=BUY px=0 qty=10
+< EXEC seq=7 REJECTED reason=INVALID_PRICE oid=0 client=1 cl=7 orig=0 sym=1 BUY LIMIT GTC px=0 qty=10 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=7
+> NEW client=1 side=BUY type=MARKET tif=GTC qty=10
+< EXEC seq=8 REJECTED reason=INVALID_TIME_IN_FORCE oid=0 client=1 cl=8 orig=0 sym=1 BUY MARKET GTC px=0 qty=10 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=8
+> NEW client=1 side=BUY px=100 qty=10 sym=7
+< EXEC seq=9 REJECTED reason=UNKNOWN_SYMBOL oid=0 client=1 cl=9 orig=0 sym=7 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=9
+> NEW client=1 side=BUY px=100 qty=10
+< EXEC seq=10 NEW reason=NONE oid=1 client=1 cl=10 orig=0 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=10
+< LEVEL seq=11 symSeq=1 sym=1 BUY px=100 qty=10 orders=1 ts=10
+< TOP seq=12 symSeq=2 sym=1 bid=10@100 ask=0@0 ts=10
+> REPLACE client=1 oid=1 px=103 qty=10
+< EXEC seq=13 REPLACE_REJECTED reason=INVALID_TICK_SIZE oid=1 client=1 cl=11 orig=10 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=11
+> REPLACE client=1 oid=1 px=100 qty=5
+< EXEC seq=14 REPLACE_REJECTED reason=INVALID_QUANTITY oid=1 client=1 cl=12 orig=10 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=12

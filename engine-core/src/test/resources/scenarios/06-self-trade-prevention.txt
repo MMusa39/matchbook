@@ -1,0 +1,37 @@
+# Client 1 has an offer at the front of the queue. Each STP mode handles a client-1 buy differently.
+> NEW client=1 side=SELL px=100 qty=5
+< EXEC seq=1 NEW reason=NONE oid=1 client=1 cl=1 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=0@0 leaves=5 cum=0 trade=0 liq=NONE ts=1
+< LEVEL seq=2 symSeq=1 sym=1 SELL px=100 qty=5 orders=1 ts=1
+< TOP seq=3 symSeq=2 sym=1 bid=0@0 ask=5@100 ts=1
+> NEW client=2 side=SELL px=100 qty=5
+< EXEC seq=4 NEW reason=NONE oid=2 client=2 cl=2 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=0@0 leaves=5 cum=0 trade=0 liq=NONE ts=2
+< LEVEL seq=5 symSeq=3 sym=1 SELL px=100 qty=10 orders=2 ts=2
+< TOP seq=6 symSeq=4 sym=1 bid=0@0 ask=10@100 ts=2
+# CANCEL_AGGRESSOR: stops at its own order, nothing trades, the buy is cancelled.
+> NEW client=1 side=BUY px=100 qty=3 stp=CANCEL_AGGRESSOR
+< EXEC seq=7 NEW reason=NONE oid=3 client=1 cl=3 orig=0 sym=1 BUY LIMIT GTC px=100 qty=3 last=0@0 leaves=3 cum=0 trade=0 liq=NONE ts=3
+< EXEC seq=8 CANCELED reason=SELF_TRADE_PREVENTION oid=3 client=1 cl=3 orig=0 sym=1 BUY LIMIT GTC px=100 qty=3 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=3
+# CANCEL_RESTING: cancels its own offer (order 1) and trades with client 2.
+> NEW client=1 side=BUY px=100 qty=3 stp=CANCEL_RESTING
+< EXEC seq=9 NEW reason=NONE oid=4 client=1 cl=4 orig=0 sym=1 BUY LIMIT GTC px=100 qty=3 last=0@0 leaves=3 cum=0 trade=0 liq=NONE ts=4
+< EXEC seq=10 CANCELED reason=SELF_TRADE_PREVENTION oid=1 client=1 cl=1 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=4
+< TRADE seq=11 symSeq=5 trade=1 sym=1 3@100 aggressor=BUY buy=4/1 sell=2/2 ts=4
+< EXEC seq=12 PARTIAL_FILL reason=NONE oid=2 client=2 cl=2 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=3@100 leaves=2 cum=3 trade=1 liq=MAKER ts=4
+< EXEC seq=13 FILL reason=NONE oid=4 client=1 cl=4 orig=0 sym=1 BUY LIMIT GTC px=100 qty=3 last=3@100 leaves=0 cum=3 trade=1 liq=TAKER ts=4
+< LEVEL seq=14 symSeq=6 sym=1 SELL px=100 qty=2 orders=1 ts=4
+< TOP seq=15 symSeq=7 sym=1 bid=0@0 ask=2@100 ts=4
+# CANCEL_BOTH: client 2's remaining 2 are ahead of a new client-1 offer. The buy trades 2 with
+# client 2, reaches its own offer, and both client-1 orders are cancelled.
+> NEW client=1 side=SELL px=100 qty=5
+< EXEC seq=16 NEW reason=NONE oid=5 client=1 cl=5 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=0@0 leaves=5 cum=0 trade=0 liq=NONE ts=5
+< LEVEL seq=17 symSeq=8 sym=1 SELL px=100 qty=7 orders=2 ts=5
+< TOP seq=18 symSeq=9 sym=1 bid=0@0 ask=7@100 ts=5
+> NEW client=1 side=BUY px=100 qty=10 stp=CANCEL_BOTH
+< EXEC seq=19 NEW reason=NONE oid=6 client=1 cl=6 orig=0 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=6
+< TRADE seq=20 symSeq=10 trade=2 sym=1 2@100 aggressor=BUY buy=6/1 sell=2/2 ts=6
+< EXEC seq=21 FILL reason=NONE oid=2 client=2 cl=2 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=2@100 leaves=0 cum=5 trade=2 liq=MAKER ts=6
+< EXEC seq=22 PARTIAL_FILL reason=NONE oid=6 client=1 cl=6 orig=0 sym=1 BUY LIMIT GTC px=100 qty=10 last=2@100 leaves=8 cum=2 trade=2 liq=TAKER ts=6
+< EXEC seq=23 CANCELED reason=SELF_TRADE_PREVENTION oid=5 client=1 cl=5 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=6
+< LEVEL seq=24 symSeq=11 sym=1 SELL px=100 qty=0 orders=0 ts=6
+< EXEC seq=25 CANCELED reason=SELF_TRADE_PREVENTION oid=6 client=1 cl=6 orig=0 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=0 cum=2 trade=0 liq=NONE ts=6
+< TOP seq=26 symSeq=12 sym=1 bid=0@0 ask=0@0 ts=6

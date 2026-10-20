@@ -1,0 +1,60 @@
+# Cancel, and the three replace cases: quantity decrease keeps priority, quantity increase and
+# price change lose it, and a replace that crosses trades immediately.
+> NEW client=1 side=BUY px=100 qty=10
+< EXEC seq=1 NEW reason=NONE oid=1 client=1 cl=1 orig=0 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=1
+< LEVEL seq=2 symSeq=1 sym=1 BUY px=100 qty=10 orders=1 ts=1
+< TOP seq=3 symSeq=2 sym=1 bid=10@100 ask=0@0 ts=1
+> NEW client=2 side=BUY px=100 qty=10
+< EXEC seq=4 NEW reason=NONE oid=2 client=2 cl=2 orig=0 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=2
+< LEVEL seq=5 symSeq=3 sym=1 BUY px=100 qty=20 orders=2 ts=2
+< TOP seq=6 symSeq=4 sym=1 bid=20@100 ask=0@0 ts=2
+> NEW client=3 side=BUY px=100 qty=10
+< EXEC seq=7 NEW reason=NONE oid=3 client=3 cl=3 orig=0 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=10 cum=0 trade=0 liq=NONE ts=3
+< LEVEL seq=8 symSeq=5 sym=1 BUY px=100 qty=30 orders=3 ts=3
+< TOP seq=9 symSeq=6 sym=1 bid=30@100 ask=0@0 ts=3
+# Order 1 reduces to 6: keeps its place at the front.
+> REPLACE client=1 oid=1 px=100 qty=6
+< EXEC seq=10 REPLACED reason=NONE oid=1 client=1 cl=4 orig=1 sym=1 BUY LIMIT GTC px=100 qty=6 last=0@0 leaves=6 cum=0 trade=0 liq=NONE ts=4
+< LEVEL seq=11 symSeq=7 sym=1 BUY px=100 qty=26 orders=3 ts=4
+< TOP seq=12 symSeq=8 sym=1 bid=26@100 ask=0@0 ts=4
+# Order 2 increases to 12: goes behind order 3.
+> REPLACE client=2 oid=2 px=100 qty=12
+< EXEC seq=13 REPLACED reason=NONE oid=2 client=2 cl=5 orig=2 sym=1 BUY LIMIT GTC px=100 qty=12 last=0@0 leaves=12 cum=0 trade=0 liq=NONE ts=5
+< LEVEL seq=14 symSeq=9 sym=1 BUY px=100 qty=16 orders=2 ts=5
+< LEVEL seq=15 symSeq=10 sym=1 BUY px=100 qty=28 orders=3 ts=5
+< TOP seq=16 symSeq=11 sym=1 bid=28@100 ask=0@0 ts=5
+# Client 3 cancels order 3.
+> CANCEL client=3 oid=3
+< EXEC seq=17 CANCELED reason=CLIENT_CANCEL oid=3 client=3 cl=6 orig=3 sym=1 BUY LIMIT GTC px=100 qty=10 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=6
+< LEVEL seq=18 symSeq=12 sym=1 BUY px=100 qty=18 orders=2 ts=6
+< TOP seq=19 symSeq=13 sym=1 bid=18@100 ask=0@0 ts=6
+# A sell for 8 fills order 1 (6) then order 2 (2).
+> NEW client=4 side=SELL px=100 qty=8
+< EXEC seq=20 NEW reason=NONE oid=4 client=4 cl=7 orig=0 sym=1 SELL LIMIT GTC px=100 qty=8 last=0@0 leaves=8 cum=0 trade=0 liq=NONE ts=7
+< TRADE seq=21 symSeq=14 trade=1 sym=1 6@100 aggressor=SELL buy=1/1 sell=4/4 ts=7
+< EXEC seq=22 FILL reason=NONE oid=1 client=1 cl=4 orig=0 sym=1 BUY LIMIT GTC px=100 qty=6 last=6@100 leaves=0 cum=6 trade=1 liq=MAKER ts=7
+< EXEC seq=23 PARTIAL_FILL reason=NONE oid=4 client=4 cl=7 orig=0 sym=1 SELL LIMIT GTC px=100 qty=8 last=6@100 leaves=2 cum=6 trade=1 liq=TAKER ts=7
+< TRADE seq=24 symSeq=15 trade=2 sym=1 2@100 aggressor=SELL buy=2/2 sell=4/4 ts=7
+< EXEC seq=25 PARTIAL_FILL reason=NONE oid=2 client=2 cl=5 orig=0 sym=1 BUY LIMIT GTC px=100 qty=12 last=2@100 leaves=10 cum=2 trade=2 liq=MAKER ts=7
+< EXEC seq=26 FILL reason=NONE oid=4 client=4 cl=7 orig=0 sym=1 SELL LIMIT GTC px=100 qty=8 last=2@100 leaves=0 cum=8 trade=2 liq=TAKER ts=7
+< LEVEL seq=27 symSeq=16 sym=1 BUY px=100 qty=10 orders=1 ts=7
+< TOP seq=28 symSeq=17 sym=1 bid=10@100 ask=0@0 ts=7
+# Client 4 rests an offer at 102; order 2 is repriced to 102 and trades against it at once.
+> NEW client=4 side=SELL px=102 qty=4
+< EXEC seq=29 NEW reason=NONE oid=5 client=4 cl=8 orig=0 sym=1 SELL LIMIT GTC px=102 qty=4 last=0@0 leaves=4 cum=0 trade=0 liq=NONE ts=8
+< LEVEL seq=30 symSeq=18 sym=1 SELL px=102 qty=4 orders=1 ts=8
+< TOP seq=31 symSeq=19 sym=1 bid=10@100 ask=4@102 ts=8
+> REPLACE client=2 oid=2 px=102 qty=12
+< EXEC seq=32 REPLACED reason=NONE oid=2 client=2 cl=9 orig=5 sym=1 BUY LIMIT GTC px=102 qty=12 last=0@0 leaves=10 cum=2 trade=0 liq=NONE ts=9
+< LEVEL seq=33 symSeq=20 sym=1 BUY px=100 qty=0 orders=0 ts=9
+< TRADE seq=34 symSeq=21 trade=3 sym=1 4@102 aggressor=BUY buy=2/2 sell=5/4 ts=9
+< EXEC seq=35 FILL reason=NONE oid=5 client=4 cl=8 orig=0 sym=1 SELL LIMIT GTC px=102 qty=4 last=4@102 leaves=0 cum=4 trade=3 liq=MAKER ts=9
+< EXEC seq=36 PARTIAL_FILL reason=NONE oid=2 client=2 cl=9 orig=0 sym=1 BUY LIMIT GTC px=102 qty=12 last=4@102 leaves=6 cum=6 trade=3 liq=TAKER ts=9
+< LEVEL seq=37 symSeq=22 sym=1 SELL px=102 qty=0 orders=0 ts=9
+< LEVEL seq=38 symSeq=23 sym=1 BUY px=102 qty=6 orders=1 ts=9
+< TOP seq=39 symSeq=24 sym=1 bid=6@102 ask=0@0 ts=9
+# Cancel of an order that no longer exists, and of someone else's order.
+> CANCEL client=1 oid=1
+< EXEC seq=40 CANCEL_REJECTED reason=UNKNOWN_ORDER oid=1 client=1 cl=10 orig=0 sym=1 null null null px=0 qty=0 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=10
+> CANCEL client=1 oid=2
+< EXEC seq=41 CANCEL_REJECTED reason=UNKNOWN_ORDER oid=2 client=1 cl=11 orig=0 sym=1 null null null px=0 qty=0 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=11

@@ -1,0 +1,50 @@
+# Market orders sweep and cancel the remainder; IOC never rests; FOK fills fully or is killed
+# without touching the book.
+> NEW client=1 side=SELL px=100 qty=5
+< EXEC seq=1 NEW reason=NONE oid=1 client=1 cl=1 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=0@0 leaves=5 cum=0 trade=0 liq=NONE ts=1
+< LEVEL seq=2 symSeq=1 sym=1 SELL px=100 qty=5 orders=1 ts=1
+< TOP seq=3 symSeq=2 sym=1 bid=0@0 ask=5@100 ts=1
+> NEW client=1 side=SELL px=101 qty=5
+< EXEC seq=4 NEW reason=NONE oid=2 client=1 cl=2 orig=0 sym=1 SELL LIMIT GTC px=101 qty=5 last=0@0 leaves=5 cum=0 trade=0 liq=NONE ts=2
+< LEVEL seq=5 symSeq=3 sym=1 SELL px=101 qty=5 orders=1 ts=2
+# Market buy for 7: fills 5@100 and 2@101.
+> NEW client=2 side=BUY type=MARKET tif=IOC qty=7
+< EXEC seq=6 NEW reason=NONE oid=3 client=2 cl=3 orig=0 sym=1 BUY MARKET IOC px=0 qty=7 last=0@0 leaves=7 cum=0 trade=0 liq=NONE ts=3
+< TRADE seq=7 symSeq=4 trade=1 sym=1 5@100 aggressor=BUY buy=3/2 sell=1/1 ts=3
+< EXEC seq=8 FILL reason=NONE oid=1 client=1 cl=1 orig=0 sym=1 SELL LIMIT GTC px=100 qty=5 last=5@100 leaves=0 cum=5 trade=1 liq=MAKER ts=3
+< EXEC seq=9 PARTIAL_FILL reason=NONE oid=3 client=2 cl=3 orig=0 sym=1 BUY MARKET IOC px=0 qty=7 last=5@100 leaves=2 cum=5 trade=1 liq=TAKER ts=3
+< LEVEL seq=10 symSeq=5 sym=1 SELL px=100 qty=0 orders=0 ts=3
+< TRADE seq=11 symSeq=6 trade=2 sym=1 2@101 aggressor=BUY buy=3/2 sell=2/1 ts=3
+< EXEC seq=12 PARTIAL_FILL reason=NONE oid=2 client=1 cl=2 orig=0 sym=1 SELL LIMIT GTC px=101 qty=5 last=2@101 leaves=3 cum=2 trade=2 liq=MAKER ts=3
+< EXEC seq=13 FILL reason=NONE oid=3 client=2 cl=3 orig=0 sym=1 BUY MARKET IOC px=0 qty=7 last=2@101 leaves=0 cum=7 trade=2 liq=TAKER ts=3
+< LEVEL seq=14 symSeq=7 sym=1 SELL px=101 qty=3 orders=1 ts=3
+< TOP seq=15 symSeq=8 sym=1 bid=0@0 ask=3@101 ts=3
+# IOC buy at 101 for 5: only 3 left at 101, remainder 2 is cancelled.
+> NEW client=2 side=BUY tif=IOC px=101 qty=5
+< EXEC seq=16 NEW reason=NONE oid=4 client=2 cl=4 orig=0 sym=1 BUY LIMIT IOC px=101 qty=5 last=0@0 leaves=5 cum=0 trade=0 liq=NONE ts=4
+< TRADE seq=17 symSeq=9 trade=3 sym=1 3@101 aggressor=BUY buy=4/2 sell=2/1 ts=4
+< EXEC seq=18 FILL reason=NONE oid=2 client=1 cl=2 orig=0 sym=1 SELL LIMIT GTC px=101 qty=5 last=3@101 leaves=0 cum=5 trade=3 liq=MAKER ts=4
+< EXEC seq=19 PARTIAL_FILL reason=NONE oid=4 client=2 cl=4 orig=0 sym=1 BUY LIMIT IOC px=101 qty=5 last=3@101 leaves=2 cum=3 trade=3 liq=TAKER ts=4
+< LEVEL seq=20 symSeq=10 sym=1 SELL px=101 qty=0 orders=0 ts=4
+< EXEC seq=21 CANCELED reason=IOC_REMAINDER oid=4 client=2 cl=4 orig=0 sym=1 BUY LIMIT IOC px=101 qty=5 last=0@0 leaves=0 cum=3 trade=0 liq=NONE ts=4
+< TOP seq=22 symSeq=11 sym=1 bid=0@0 ask=0@0 ts=4
+> NEW client=1 side=SELL px=103 qty=4
+< EXEC seq=23 NEW reason=NONE oid=5 client=1 cl=5 orig=0 sym=1 SELL LIMIT GTC px=103 qty=4 last=0@0 leaves=4 cum=0 trade=0 liq=NONE ts=5
+< LEVEL seq=24 symSeq=12 sym=1 SELL px=103 qty=4 orders=1 ts=5
+< TOP seq=25 symSeq=13 sym=1 bid=0@0 ask=4@103 ts=5
+# FOK buy at 103 for 5: only 4 available, killed, book unchanged.
+> NEW client=2 side=BUY tif=FOK px=103 qty=5
+< EXEC seq=26 NEW reason=NONE oid=6 client=2 cl=6 orig=0 sym=1 BUY LIMIT FOK px=103 qty=5 last=0@0 leaves=5 cum=0 trade=0 liq=NONE ts=6
+< EXEC seq=27 CANCELED reason=FOK_NOT_FILLED oid=6 client=2 cl=6 orig=0 sym=1 BUY LIMIT FOK px=103 qty=5 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=6
+# FOK buy at 103 for 4: fills completely.
+> NEW client=2 side=BUY tif=FOK px=103 qty=4
+< EXEC seq=28 NEW reason=NONE oid=7 client=2 cl=7 orig=0 sym=1 BUY LIMIT FOK px=103 qty=4 last=0@0 leaves=4 cum=0 trade=0 liq=NONE ts=7
+< TRADE seq=29 symSeq=14 trade=4 sym=1 4@103 aggressor=BUY buy=7/2 sell=5/1 ts=7
+< EXEC seq=30 FILL reason=NONE oid=5 client=1 cl=5 orig=0 sym=1 SELL LIMIT GTC px=103 qty=4 last=4@103 leaves=0 cum=4 trade=4 liq=MAKER ts=7
+< EXEC seq=31 FILL reason=NONE oid=7 client=2 cl=7 orig=0 sym=1 BUY LIMIT FOK px=103 qty=4 last=4@103 leaves=0 cum=4 trade=4 liq=TAKER ts=7
+< LEVEL seq=32 symSeq=15 sym=1 SELL px=103 qty=0 orders=0 ts=7
+< TOP seq=33 symSeq=16 sym=1 bid=0@0 ask=0@0 ts=7
+# Market order into an empty side is cancelled with nothing filled.
+> NEW client=2 side=BUY type=MARKET tif=IOC qty=1
+< EXEC seq=34 NEW reason=NONE oid=8 client=2 cl=8 orig=0 sym=1 BUY MARKET IOC px=0 qty=1 last=0@0 leaves=1 cum=0 trade=0 liq=NONE ts=8
+< EXEC seq=35 CANCELED reason=IOC_REMAINDER oid=8 client=2 cl=8 orig=0 sym=1 BUY MARKET IOC px=0 qty=1 last=0@0 leaves=0 cum=0 trade=0 liq=NONE ts=8
