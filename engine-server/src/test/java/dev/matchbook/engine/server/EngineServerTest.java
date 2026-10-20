@@ -182,7 +182,8 @@ class EngineServerTest {
         String scrape = awaitScrapeContaining("matchbook_engine_rejects_total");
         assertThat(scrape).containsPattern("matchbook_engine_commands_total\\{[^}]*result=\"NEW\"[^}]*shard=\"0\"");
         assertThat(scrape).containsPattern("matchbook_engine_rejects_total\\{[^}]*reason=\"PRICE_OUT_OF_BAND\"");
-        assertThat(scrape).contains("jvm_gc_pause_seconds").contains("application=\"engine\"");
+        // jvm_gc_pause_seconds only appears after the first GC, which a fresh CI JVM may not have had.
+        assertThat(scrape).contains("jvm_memory_used_bytes").contains("application=\"engine\"");
         assertThat(scrape).contains("matchbook_engine_latency_seconds_bucket");
         assertThat(scrape).contains("matchbook_engine_match_seconds_bucket");
         assertThat(scrape).containsPattern("matchbook_engine_queue_depth\\{[^}]*ring=\"inbound\"");
