@@ -18,11 +18,16 @@
         <module>engine-pipeline</module>
         <module>engine-bench</module>
         <module>engine-server</module>
+        <module>gateway</module>
+        <module>marketdata</module>
+        <module>posttrade</module>
+        <module>loadtest</module>
     </modules>
 
     <properties>
         <java.version>25</java.version>
         <maven.compiler.release>25</maven.compiler.release>
+        <skipTests>false</skipTests>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -166,6 +171,9 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>${maven-failsafe-plugin.version}</version>
+                    <configuration>
+                        <skipITs>${skipTests}</skipITs>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
