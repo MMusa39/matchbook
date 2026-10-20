@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Matchbook Live Book</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #6b7686; --line: #e3e7ed;
+      --bid: #137a4b; --bid-bg: rgba(19, 122, 75, 0.12); --ask: #b4282f; --ask-bg: rgba(180, 40, 47, 0.12);
+      --warn: #a15c00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11151b; --panel: #181e26; --text: #e4e9f0; --muted: #8b96a6; --line: #2a323d;
+        --bid: #3fbf7f; --bid-bg: rgba(63, 191, 127, 0.14); --ask: #ef5a62; --ask-bg: rgba(239, 90, 98, 0.14);
+        --warn: #f0a640;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+           font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 14px 16px;
+             border-bottom: 1px solid var(--line); background: var(--panel); }
+    h1 { font-size: 16px; margin: 0 12px 0 0; }
+    select { font: inherit; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line);
+             background: var(--bg); color: var(--text); }
+    .status { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .status.bad { color: var(--warn); }
+    main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; padding: 16px;
+           max-width: 1100px; margin: 0 auto; }
+    @media (max-width: 760px) { main { grid-template-columns: minmax(0, 1fr); } }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { padding: 3px 6px; text-align: right; }
+    th { color: var(--muted); font-weight: 500; font-size: 12px; }
+    td.price.bid { color: var(--bid); } td.price.ask { color: var(--ask); }
+    tr.level td { position: relative; }
+    .depth { position: absolute; top: 2px; bottom: 2px; right: 0; z-index: 0; border-radius: 3px; }
+    .depth.bid { background: var(--bid-bg); } .depth.ask { background: var(--ask-bg); }
+    td span { position: relative; z-index: 1; }
+    .spread { text-align: center; color: var(--muted); padding: 6px; font-variant-numeric: tabular-nums; }
+    .buy { color: var(--bid); } .sell { color: var(--ask); }
+    .empty { color: var(--muted); text-align: center; padding: 12px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Matchbook live book</h1>
+  <label>Symbol <select id="symbol"></select></label>
+  <span id="status" class="status">connecting…</span>
+</header>
+<main>
+  <section>
+    <h2>Depth</h2>
+    <table>
+      <thead><tr><th>Orders</th><th>Quantity</th><th>Price</th></tr></thead>
+      <tbody id="asks"></tbody>
+    </table>
+    <div id="spread" class="spread">–</div>
+    <table>
+      <tbody id="bids"></tbody>
+    </table>
+  </section>
+  <section>
+    <h2>Trades</h2>
+    <table>
+      <thead><tr><th>Price</th><th>Quantity</th><th>Side</th></tr></thead>
+      <tbody id="trades"></tbody>
+    </table>
+  </section>
+</main>
+<script>
+  const SYMBOLS = ["AAPL", "MSFT", "NVDA", "TSLA"];
+  const DEPTH = 12;
+  const select = document.getElementById("symbol");
+  SYMBOLS.forEach(s => select.add(new Option(s, s)));
+  try { select.value = localStorage.getItem("matchbook.symbol") || "AAPL"; } catch (e) { /* storage blocked */ }
+
+  let ws, book, seq, gaps = 0;
+
+  function reset() {
+    book = { bids: new Map(), asks: new Map(), trades: [] };
+    seq = null;
+  }
+
+  function connect() {
+    reset();
+    const scheme = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${scheme}://${location.host}/ws/market-data`);
+    ws.onopen = () => ws.send(JSON.stringify({ op: "subscribe", symbols: [select.value] }));
+    ws.onmessage = e => onMessage(JSON.parse(e.data));
+    ws.onclose = () => { setStatus("disconnected, retrying…", true); setTimeout(connect, 1000); };
+  }
+
+  function onMessage(m) {
+    if (m.symbol !== select.value) return;
+    if (m.type === "snapshot") {
+      reset();
+      m.bids.forEach(l => book.bids.set(l.price, l));
+      m.asks.forEach(l => book.asks.set(l.price, l));
+      book.trades = m.trades.slice(0, 30);
+      seq = m.seq;
+    } else if (m.type === "stale") {
+      reset();
+      setStatus("feed resynchronising…", true);
+      return;
+    } else {
+      if (seq === null) return;
+      if (m.seq !== seq + 1) {        // gap: our copy can no longer be trusted
+        gaps++;
+        ws.close();
+        return;
+      }
+      seq = m.seq;
+      if (m.type === "level") {
+        const side = m.side === "BUY" ? book.bids : book.asks;
+        if (m.quantity === 0) side.delete(m.price); else side.set(m.price, m);
+      } else if (m.type === "trade") {
+        book.trades.unshift(m);
+        book.trades.length = Math.min(book.trades.length, 30);
+      }
+    }
+    setStatus(`seq ${seq}` + (gaps ? ` · ${gaps} gap(s) recovered` : ""), false);
+    render();
+  }
+
+  function setStatus(text, bad) {
+    const el = document.getElementById("status");
+    el.textContent = text;
+    el.className = "status" + (bad ? " bad" : "");
+  }
+
+  function sorted(map, descending) {
+    return [...map.values()].sort((a, b) => descending ? b.price - a.price : a.price - b.price).slice(0, DEPTH);
+  }
+
+  function rows(levels, side, maxQty) {
+    if (!levels.length) return `<tr><td colspan="3" class="empty">no ${side === "bid" ? "bids" : "offers"}</td></tr>`;
+    return levels.map(l => `<tr class="level">
+        <td><span>${l.orders}</span></td>
+        <td><div class="depth ${side}" style="width:${(100 * l.quantity / maxQty).toFixed(1)}%"></div>
+            <span>${l.quantity.toLocaleString()}</span></td>
+        <td class="price ${side}"><span>${l.price}</span></td></tr>`).join("");
+  }
+
+  function render() {
+    const bids = sorted(book.bids, true), asks = sorted(book.asks, false);
+    const maxQty = Math.max(1, ...bids.map(l => l.quantity), ...asks.map(l => l.quantity));
+    document.getElementById("asks").innerHTML = rows(asks.slice().reverse(), "ask", maxQty);
+    document.getElementById("bids").innerHTML = rows(bids, "bid", maxQty);
+    document.getElementById("spread").textContent = bids.length && asks.length
+      ? `spread ${(Number(asks[0].price) - Number(bids[0].price)).toFixed(2)}` : "–";
+    document.getElementById("trades").innerHTML = book.trades.length ? book.trades.map(t =>
+      `<tr><td>${t.price}</td><td>${t.quantity.toLocaleString()}</td>
+           <td class="${t.aggressor === "BUY" ? "buy" : "sell"}">${t.aggressor}</td></tr>`).join("")
+      : `<tr><td colspan="3" class="empty">no trades yet</td></tr>`;
+  }
+
+  select.onchange = () => {
+    try { localStorage.setItem("matchbook.symbol", select.value); } catch (e) { /* storage blocked */ }
+    if (ws) { ws.onclose = null; ws.close(); }
+    connect();
+  };
+  connect();
+</script>
+</body>
+</html>

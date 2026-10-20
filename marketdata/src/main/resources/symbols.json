@@ -1,0 +1,6 @@
+[
+  {"symbol": "AAPL", "id": 1, "shard": 0, "priceScale": 100, "tickSize": 1, "lotSize": 1, "minQuantity": 1, "maxQuantity": 1000000, "lowPrice": 10000, "highPrice": 40000},
+  {"symbol": "MSFT", "id": 2, "shard": 0, "priceScale": 100, "tickSize": 1, "lotSize": 1, "minQuantity": 1, "maxQuantity": 1000000, "lowPrice": 20000, "highPrice": 70000},
+  {"symbol": "NVDA", "id": 3, "shard": 1, "priceScale": 100, "tickSize": 1, "lotSize": 1, "minQuantity": 1, "maxQuantity": 1000000, "lowPrice": 5000, "highPrice": 30000},
+  {"symbol": "TSLA", "id": 4, "shard": 1, "priceScale": 100, "tickSize": 1, "lotSize": 1, "minQuantity": 1, "maxQuantity": 1000000, "lowPrice": 10000, "highPrice": 60000}
+]
