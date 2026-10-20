@@ -210,9 +210,19 @@ public final class OpenLoopLoadGenerator {
         if (!Files.exists(dir)) {
             return;
         }
-        try (Stream<Path> walk = Files.walk(dir)) {
-            for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
-                Files.delete(p);
+        // Background journal threads may still be finishing after halt(); retry until the tree is gone.
+        for (int attempt = 0; attempt < 20 && Files.exists(dir); attempt++) {
+            try (Stream<Path> walk = Files.walk(dir)) {
+                for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
+                    Files.deleteIfExists(p);
+                }
+            } catch (IOException | java.io.UncheckedIOException e) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
         }
     }

@@ -341,7 +341,13 @@ public final class Journal implements AutoCloseable {
             }
         }
         if (preparer != null) {
-            preparer.shutdownNow();
+            preparer.shutdown();
+            try {
+                preparer.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
+        deleteLeftoverNextSegments(directory);
     }
 }

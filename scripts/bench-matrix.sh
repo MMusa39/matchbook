@@ -7,17 +7,20 @@ cd "$(dirname "$0")/.."
 OUT=${1:-docs/results/loadgen}
 JAR=engine-bench/target/benchmarks.jar
 HEAP="-Xms2g -Xmx2g -XX:+AlwaysPreTouch"
-DUR=30
+DUR=20
 WARM=10
+REPEAT=${REPEAT:-3}   # every configuration runs this many times; RESULTS.md reports median and range
 mkdir -p "$OUT"
 
 run() { # label jvm-flags... -- generator-args...
   local label=$1; shift
   local jvm=()
   while [[ $1 != "--" ]]; do jvm+=("$1"); shift; done; shift
-  echo ">>> $label"
-  java $HEAP "${jvm[@]}" -cp "$JAR" dev.matchbook.bench.OpenLoopLoadGenerator \
-       --duration $DUR --warmup $WARM --label "$label" --out "$OUT" "$@"
+  for r in $(seq 1 "$REPEAT"); do
+    echo ">>> $label-r$r"
+    java $HEAP "${jvm[@]}" -cp "$JAR" dev.matchbook.bench.OpenLoopLoadGenerator \
+         --duration $DUR --warmup $WARM --label "$label-r$r" --out "$OUT" "$@"
+  done
 }
 
 # A. Throughput sweep: where does latency break down?
