@@ -274,9 +274,8 @@ lets ArchUnit enforce two separate boundaries:
 | 6 | Ops | Docker Compose one-command stack, Micrometer metrics, Grafana dashboards as code, OTel tracing to Jaeger, Helm chart verified on kind, Gatling simulation, GitHub Actions CI with a benchmark smoke run, GC and wait-strategy before/after numbers |
 | 7 | Optional | Web UI, market-maker and noise-trader bots, then FIX 4.4 via QuickFIX/J if time allows |
 
-After each milestone I'll report what's done, the measured numbers and what's next.
-Then the docs: README, ADRs, `DESIGN.md`, `RESULTS.md`, resume bullets, LinkedIn blurb and
-interview Q&A.
+Each milestone ends with a summary of what's done, the measured numbers and what's next.
+Then the docs: README, ADRs, `DESIGN.md` and `RESULTS.md`.
 
 ## 9. Risks and honest limitations
 
@@ -295,9 +294,5 @@ interview Q&A.
 
 ## 10. Housekeeping
 
-- The brief (`matching-engine-prompt.md`) includes personal context about your employer.
-  I'll add it to `.git/info/exclude` so it never ends up in the public repo, unless you
-  want it committed.
 - No secrets in the repo. API keys and passwords in Compose and Helm will be obvious local
   placeholders (`changeme-local`), and `.env` files are git-ignored.
-- I won't push anywhere.

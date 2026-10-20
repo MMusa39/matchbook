@@ -6,4 +6,4 @@
 docs/results/
 data/
 .claude/
-matching-engine-prompt.md
+**/*.md
