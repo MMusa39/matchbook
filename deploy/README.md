@@ -21,10 +21,10 @@ docker compose -f deploy/compose.yaml down              # add -v to drop the eng
 ```
 
 The first build downloads every Maven dependency inside the build container; later builds reuse a
-BuildKit cache. Docker Desktop needs about 5–6 GB of memory for the full stack.
+BuildKit cache. The Docker VM (Docker Desktop or Colima) needs about 5–6 GB of memory for the full stack.
 
 The engine runs with `SLEEPING` (inbound) and `BLOCKING` (outbound) wait strategies here. Busy-spinning
-threads would take most of Docker Desktop's CPUs and starve Kafka and the databases. Latency
+threads would take most of the Docker VM's CPUs and starve Kafka and the databases. Latency
 benchmarks run outside Docker with busy-spin (see `docs/RESULTS.md`).
 
 ## Kubernetes (kind)

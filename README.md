@@ -131,6 +131,8 @@ java -jar engine-bench/target/benchmarks.jar MatchingEngineBenchmark -prof gc   
 scripts/bench-matrix.sh                                                            # open-loop latency matrix
 scripts/summarize-loadgen.py                                                       # tables for RESULTS.md
 java -cp engine-bench/target/benchmarks.jar dev.matchbook.bench.SnapshotPauseTimer
+java -jar engine-bench/target/benchmarks.jar ShardThroughputBenchmark -t 4                    # engine-only shard scaling
+java -cp engine-bench/target/benchmarks.jar dev.matchbook.bench.ShardScalingBenchmark --shards 1,2,4   # full-pipeline shard scaling
 ./mvnw -pl loadtest gatling:test -Dgateway=http://localhost:8080 -Drate=200        # end to end, needs the stack
 ```
 
@@ -150,6 +152,7 @@ commands are in [`docs/RESULTS.md`](docs/RESULTS.md).
 | Restart: replay a 10 M-command, 800 MB journal | **1.10 s** (11.3 M commands/s); 0.49 s with a snapshot at 9 M |
 | `kill -9` mid-stream | recovered state **byte-identical** to a fresh engine fed the journaled commands |
 | End to end through the gateway (Gatling, open model, 4-vCPU Docker VM) | **2 136 req/s, 0 errors, p99 42 ms**; at 426 req/s p99 4 ms |
+| CPU pinning on Linux (journal and matching threads) | kernel-verified; p99.9 **6.6 ms → 2.5 ms** at 100k commands/s, in a VM (RESULTS §8) |
 | Post-trade consistency after load | every symbol nets to 0; 5 786 trades applied exactly once |
 
 The laptop's p99.9 and above are dominated by OS scheduling (RESULTS §1). That is reported as

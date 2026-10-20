@@ -12,7 +12,7 @@ Every number in this repository comes from a run recorded here. The raw outputs 
 | Heap | `-Xms2g -Xmx2g -XX:+AlwaysPreTouch` (JMH and load generator) |
 | Background load | VS Code, Chrome (playing video) and a Colima Linux VM were running; normal for a laptop, and the reason for repeated runs |
 | Isolation | **None.** macOS cannot pin threads or isolate cores. Spinning threads compete with everything else |
-| Code | JMH: `engine-core` at `7efd952`. Open-loop matrix and recovery timer: `df5f360`. Snapshot timer: `c9c5294`. Journal-roll comparison: `95828d6` vs `15afe54`. Gatling: `c9c5294`+ with the simulation fix. Post-trade drain: `8cf1271` |
+| Code | JMH: `engine-core` at `7efd952`. Open-loop matrix and recovery timer: `df5f360`. Snapshot timer: `c9c5294`. Journal-roll comparison: `95828d6` vs `15afe54`. Gatling: `c9c5294`+ with the simulation fix. Post-trade drain: `8cf1271`. Shard scaling: `bc2697c`. Linux pinning: `8b16d44` |
 
 **How to read the latency numbers.** Medians and p99 are stable and characterise the engine. p99.9
 and above, and the maxima, are dominated by the OS descheduling threads: in every open-loop run the

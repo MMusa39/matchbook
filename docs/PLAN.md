@@ -1,5 +1,12 @@
 # Matchbook — Project Plan
 
+> **Historical document.** This is the plan written and approved before any code existed, and it is
+> kept unchanged as a record. What was actually built and measured is in the [README](../README.md),
+> [`RESULTS.md`](RESULTS.md) and [`DESIGN.md`](DESIGN.md). Notable differences:
+> - the Docker runtime turned out to be Colima, not Docker Desktop;
+> - the FIX 4.4 gateway, bots and web UI were all built;
+> - Gatling runs over REST.
+
 A small but realistic electronic exchange in Java 25. The star is a single-threaded,
 zero-allocation, price-time-priority matching engine. The surrounding Spring Boot services
 handle order entry, risk, market data and post-trade, the way a real venue is structured.

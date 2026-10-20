@@ -38,6 +38,6 @@ change after it, and a way to know when they have missed one.
 
 - **UDP multicast with a separate TCP snapshot and recovery channel:** what exchanges actually use (for
   example ITCH plus its recovery protocols), and the right answer at scale. It needs a multicast-capable
-  network, which Docker Desktop and kind do not give us.
+  network, which a desktop Docker VM and kind do not give us.
 - **Kafka for market data:** durable and replayable, but adds milliseconds and a broker hop to a feed
   whose value decays in microseconds.
