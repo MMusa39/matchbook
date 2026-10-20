@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Matchbook Live Book</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='2' width='6' height='12' rx='1' fill='%23137a4b'/%3E%3Crect x='9' y='2' width='6' height='12' rx='1' fill='%23b4282f'/%3E%3C/svg%3E">
   <style>
     :root {
       --bg: #f6f7f9; --panel: #ffffff; --text: #1c2430; --muted: #6b7686; --line: #e3e7ed;
@@ -32,7 +33,8 @@
     @media (max-width: 760px) { main { grid-template-columns: minmax(0, 1fr); } }
     section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
     h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px; }
-    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; table-layout: fixed; }
+    col.orders { width: 18%; } col.qty { width: 52%; } col.px { width: 30%; }
     th, td { padding: 3px 6px; text-align: right; }
     th { color: var(--muted); font-weight: 500; font-size: 12px; }
     td.price.bid { color: var(--bid); } td.price.ask { color: var(--ask); }
@@ -54,12 +56,15 @@
 <main>
   <section>
     <h2>Depth</h2>
+    <!-- Asks and bids are separate tables; the shared column widths keep their rows aligned. -->
     <table>
+      <colgroup><col class="orders"><col class="qty"><col class="px"></colgroup>
       <thead><tr><th>Orders</th><th>Quantity</th><th>Price</th></tr></thead>
       <tbody id="asks"></tbody>
     </table>
     <div id="spread" class="spread">–</div>
     <table>
+      <colgroup><col class="orders"><col class="qty"><col class="px"></colgroup>
       <tbody id="bids"></tbody>
     </table>
   </section>
