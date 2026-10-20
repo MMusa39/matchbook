@@ -1,0 +1,5 @@
+label=fsync-EVERY_BATCH-r1 rate=100000/s achieved=100000/s duration=20s wait=BUSY_SPIN/YIELDING fsync=EVERY_BATCH pooling=true pretouch=true gc=G1_Young_Generation+G1_Concurrent_GC+G1_Old_Generation
+  response time (from intended send, CO-corrected) us: p50=29.50 p90=40.35 p99=72.64 p99.9=5410.82 p99.99=9609.22 max=11132.93 n=2000000
+  service time  (from actual send, naive)          us: p50=29.47 p90=40.06 p99=72.13 p99.9=4964.35 p99.99=7905.28 max=9895.94
+  producer max lag behind schedule: 6732.33 us; gc during measurement: 0 collections, 0 ms; process cpu: 3.10 cores
+  publish: max 3046.92 us, blocked on full ring 16.2 ms total; max ring depth inbound 1024, outbound 1471

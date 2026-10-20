@@ -1,0 +1,1 @@
+commands=10000000 snapshotAt=0 replayed=10000000 journalBytesUsed=800000000 runs=[1629, 1076, 1056, 1101, 1115] median=1101 ms (start() total; replay only 887 ms on last run => 11.3 M commands/s)

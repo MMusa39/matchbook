@@ -1,0 +1,4 @@
+label=journal-roll-before-r1 rate=1000000/s achieved=999999/s duration=20s wait=BUSY_SPIN/YIELDING fsync=NONE pooling=true pretouch=true gc=G1_Young_Generation+G1_Concurrent_GC+G1_Old_Generation
+  response time (from intended send, CO-corrected) us: p50=0.58 p90=0.88 p99=104792.06 p99.9=218890.24 p99.99=233308.16 max=235012.10 n=20000000
+  service time  (from actual send, naive)          us: p50=0.58 p90=0.83 p99=2344.96 p99.9=127795.20 p99.99=233308.16 max=235012.10
+  producer max lag behind schedule: 221332.21 us; gc during measurement: 0 collections, 0 ms; process cpu: 3.95 cores

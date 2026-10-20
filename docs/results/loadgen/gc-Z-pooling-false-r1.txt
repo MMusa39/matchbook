@@ -1,0 +1,5 @@
+label=gc-Z-pooling-false-r1 rate=1000000/s achieved=999998/s duration=20s wait=BUSY_SPIN/YIELDING fsync=NONE pooling=false pretouch=true gc=ZGC_Minor_Cycles+ZGC_Minor_Pauses+ZGC_Major_Cycles+ZGC_Major_Pauses
+  response time (from intended send, CO-corrected) us: p50=0.63 p90=4.42 p99=960.00 p99.9=10944.51 p99.99=15400.96 max=15982.59 n=20000000
+  service time  (from actual send, naive)          us: p50=0.63 p90=4.09 p99=695.81 p99.9=10199.04 p99.99=15065.09 max=15695.87
+  producer max lag behind schedule: 19055.79 us; gc during measurement: 18 collections, 115 ms; process cpu: 3.93 cores
+  publish: max 18303.96 us, blocked on full ring 102.0 ms total; max ring depth inbound 16384, outbound 35119

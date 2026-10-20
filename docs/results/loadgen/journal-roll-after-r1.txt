@@ -1,0 +1,5 @@
+label=journal-roll-after-r1 rate=1000000/s achieved=999999/s duration=20s wait=BUSY_SPIN/YIELDING fsync=NONE pooling=true pretouch=true gc=G1_Young_Generation+G1_Concurrent_GC+G1_Old_Generation
+  response time (from intended send, CO-corrected) us: p50=0.67 p90=0.88 p99=64.10 p99.9=2263.04 p99.99=9166.85 max=9994.24 n=20000000
+  service time  (from actual send, naive)          us: p50=0.67 p90=0.88 p99=63.68 p99.9=1497.09 p99.99=3991.55 max=5214.21
+  producer max lag behind schedule: 21532.29 us; gc during measurement: 0 collections, 0 ms; process cpu: 3.98 cores
+  publish: max 15218.00 us, blocked on full ring 32.4 ms total; max ring depth inbound 16384, outbound 24578

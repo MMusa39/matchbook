@@ -1,0 +1,3 @@
+resting=10000 snapshotBytes=760088 pause ms: median=1.02 min=0.46 max=2.59 all=[2.59, 1.14, 0.49, 1.04, 0.94, 1.02, 0.46]
+resting=100000 snapshotBytes=7600088 pause ms: median=2.77 min=2.51 max=4.24 all=[4.24, 4.05, 3.60, 2.62, 2.56, 2.51, 2.77]
+resting=1000000 snapshotBytes=76000088 pause ms: median=93.02 min=85.68 max=96.74 all=[95.73, 93.02, 94.22, 96.74, 85.68, 90.74, 86.83]

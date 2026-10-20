@@ -1,0 +1,5 @@
+label=wait-YIELDING-r3 rate=200000/s achieved=200000/s duration=20s wait=YIELDING/YIELDING fsync=NONE pooling=true pretouch=true gc=G1_Young_Generation+G1_Concurrent_GC+G1_Old_Generation
+  response time (from intended send, CO-corrected) us: p50=0.79 p90=1.88 p99=29.09 p99.9=5308.42 p99.99=10788.86 max=12730.37 n=4000000
+  service time  (from actual send, naive)          us: p50=0.79 p90=1.88 p99=28.80 p99.9=4390.91 p99.99=10788.86 max=12730.37
+  producer max lag behind schedule: 7635.71 us; gc during measurement: 0 collections, 0 ms; process cpu: 3.95 cores
+  publish: max 441.13 us, blocked on full ring 2.1 ms total; max ring depth inbound 2588, outbound 2096
