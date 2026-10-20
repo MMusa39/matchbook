@@ -51,7 +51,9 @@ ts("Commands / s by response", [("sum by (result) (rate(matchbook_engine_command
 ts("Trades / s", [("sum by (shard) (rate(matchbook_engine_trades_total[30s]))", "shard {{shard}}")], "ops", 8)
 ts("Rejects / s by reason", [
     ("sum by (reason) (rate(matchbook_engine_rejects_total[1m]))", "engine {{reason}}"),
-    ("sum by (reason) (rate(matchbook_gateway_rejects_total[1m]))", "gateway {{reason}}")], "ops", 16)
+    # Only rejects decided by the gateway itself; engine rejects passing through are counted on the engine line.
+    ("sum by (reason) (rate(matchbook_gateway_rejects_total{reason=~\"RISK_.*|RATE_LIMITED.*|REDIS_.*|ENGINE_.*|OUTCOME_.*|DUPLICATE_.*\"}[1m]))",
+     "gateway {{reason}}")], "ops", 16)
 advance()
 ts("Match time (matching stage)", quantiles("matchbook_engine_match_seconds"), "s", 0,
    description="Time inside the matching stage per command, measured on the matching thread")
@@ -70,7 +72,8 @@ ts("Engine circuit breaker", [("max by (state) (resilience4j_circuitbreaker_stat
 advance()
 
 row("Post-trade")
-ts("Kafka consumer lag", [("max by (topic) (kafka_consumer_fetch_manager_records_lag_max{application=\"posttrade\"})",
+# Kafka's client metrics tag topics twice (dots and underscores) and add a topic-less total: keep the real names.
+ts("Kafka consumer lag", [("max by (topic) (kafka_consumer_fetch_manager_records_lag_max{application=\"posttrade\", topic=~\"matchbook\\\\..*\"})",
                            "{{topic}}")], "short", 0)
 ts("Events applied vs duplicates", [("sum by (result) (rate(matchbook_posttrade_events_total[1m]))", "{{result}}")],
    "ops", 8, description="Duplicates are re-deliveries removed by the processed_events key")

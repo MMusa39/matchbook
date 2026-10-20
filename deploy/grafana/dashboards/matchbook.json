@@ -167,7 +167,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (reason) (rate(matchbook_gateway_rejects_total[1m]))",
+          "expr": "sum by (reason) (rate(matchbook_gateway_rejects_total{reason=~\"RISK_.*|RATE_LIMITED.*|REDIS_.*|ENGINE_.*|OUTCOME_.*|DUPLICATE_.*\"}[1m]))",
           "legendFormat": "gateway {{reason}}"
         }
       ]
@@ -567,7 +567,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max by (topic) (kafka_consumer_fetch_manager_records_lag_max{application=\"posttrade\"})",
+          "expr": "max by (topic) (kafka_consumer_fetch_manager_records_lag_max{application=\"posttrade\", topic=~\"matchbook\\\\..*\"})",
           "legendFormat": "{{topic}}"
         }
       ]
