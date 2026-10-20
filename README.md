@@ -65,7 +65,7 @@ flowchart LR
 | [`engine-core`](engine-core) | The order book and matching rules. No dependencies but Agrona, enforced by ArchUnit; deterministic; zero allocation |
 | [`engine-pipeline`](engine-pipeline) | Disruptor wiring, memory-mapped journal (Java FFM), snapshots, crash recovery |
 | [`engine-server`](engine-server) | The engine process: gRPC API, event and market data streams, Kafka publishing, metrics, tracing. No Spring |
-| [`gateway`](gateway) | Order entry: gRPC + REST, API keys, Redis rate limit and idempotency, risk, Resilience4j |
+| [`gateway`](gateway) | Order entry: gRPC, REST and FIX 4.4 (QuickFIX/J), API keys, Redis rate limit and idempotency, risk, Resilience4j |
 | [`marketdata`](marketdata) | Book replicas and WebSocket feed (snapshot + sequenced incrementals), live book UI |
 | [`posttrade`](posttrade) | Kafka → PostgreSQL positions and average-cost P&L, Flyway, transactional outbox, DLT |
 | [`engine-bench`](engine-bench) | JMH benchmarks, open-loop latency generator (HdrHistogram, coordinated-omission corrected), recovery and snapshot timers |
@@ -86,6 +86,7 @@ docker compose -f deploy/compose.yaml up -d --build
 |---|---|
 | Order entry REST | http://localhost:8080/api/v1/orders |
 | Order entry gRPC | localhost:9091 (`matchbook.v1.OrderEntry`, metadata `x-api-key`) |
+| Order entry FIX 4.4 | localhost:9876 (TargetCompID `MATCHBOOK`, API key in `Password (554)` on Logon) |
 | Live order book UI | http://localhost:8081 |
 | Market data WebSocket | ws://localhost:8081/ws/market-data |
 | Positions and P&L | http://localhost:8082/api/v1/positions/{clientId} |

@@ -39,7 +39,8 @@ class RedisAdmissionIT {
     static RedisAdmission admission(int capacity, double refillPerSecond) {
         return new RedisAdmission(redis, new GatewayProperties("x", Duration.ofSeconds(1), "", Map.of(),
                 new GatewayProperties.RateLimit(capacity, refillPerSecond), Duration.ofMinutes(5),
-                new GatewayProperties.Risk(1, BigDecimal.ONE, 1, BigDecimal.ONE)));
+                new GatewayProperties.Risk(1, BigDecimal.ONE, 1, BigDecimal.ONE),
+                new GatewayProperties.Fix(false, 0, "MATCHBOOK")));
     }
 
     @Test

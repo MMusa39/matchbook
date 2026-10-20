@@ -39,6 +39,7 @@
         <grpc.version>1.83.1</grpc.version>
         <protobuf-maven-plugin.version>5.1.11</protobuf-maven-plugin.version>
         <resilience4j.version>2.4.0</resilience4j.version>
+        <quickfixj.version>3.0.2</quickfixj.version>
 
         <!-- Engine libraries (not managed by Spring Boot) -->
         <agrona.version>2.7.0</agrona.version>

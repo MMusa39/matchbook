@@ -83,4 +83,7 @@ message ClientExecutionReport {
   string cum_quantity = 13;
   int64 trade_id = 14;
   int64 timestamp = 15;
+  string orig_client_order_id = 16;  // previous client order id, on cancel and replace reports
+  OrderType order_type = 17;
+  TimeInForce time_in_force = 18;
 }

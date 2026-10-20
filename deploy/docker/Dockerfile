@@ -24,7 +24,7 @@ ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-XX:+AlwaysPreTouch",
 
 FROM runtime AS gateway
 COPY --from=build /src/gateway/target/gateway-*.jar /app/app.jar
-EXPOSE 8080 9091
+EXPOSE 8080 9091 9876
 ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "/app/app.jar"]
 
 FROM runtime AS marketdata

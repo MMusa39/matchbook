@@ -47,7 +47,14 @@ public final class TestEnvironment {
     }
 
     public static void register(DynamicPropertyRegistry registry) {
+        register(registry, 0);
+    }
+
+    /** @param fixPort a free port to run the FIX acceptor on, or 0 to disable it */
+    public static void register(DynamicPropertyRegistry registry, int fixPort) {
         start();
+        registry.add("matchbook.fix.enabled", () -> fixPort > 0 ? "true" : "false");
+        registry.add("matchbook.fix.port", () -> Integer.toString(fixPort));
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
         registry.add("matchbook.engine-target", () -> "localhost:" + engine.port());

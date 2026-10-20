@@ -18,6 +18,7 @@ import java.util.Map;
  * @param rateLimit        per-client token bucket
  * @param idempotencyTtl   how long a client order id is remembered
  * @param risk             pre-trade risk limits, applied to every client
+ * @param fix              FIX 4.4 acceptor
  */
 @ConfigurationProperties("matchbook")
 public record GatewayProperties(
@@ -27,10 +28,19 @@ public record GatewayProperties(
         Map<Long, String> apiKeys,
         @DefaultValue RateLimit rateLimit,
         @DefaultValue("24h") Duration idempotencyTtl,
-        @DefaultValue Risk risk) {
+        @DefaultValue Risk risk,
+        @DefaultValue Fix fix) {
 
     public GatewayProperties {
         apiKeys = apiKeys == null ? Map.of() : Map.copyOf(apiKeys);
+    }
+
+    /**
+     * FIX 4.4 order entry. Clients log on with any SenderCompID, {@code TargetCompID = senderCompId}, and
+     * their API key in {@code Password (554)}.
+     */
+    public record Fix(@DefaultValue("true") boolean enabled, @DefaultValue("9876") int port,
+                      @DefaultValue("MATCHBOOK") String senderCompId) {
     }
 
     /** {@code capacity} tokens, refilled at {@code refillPerSecond}; each request costs one token. */

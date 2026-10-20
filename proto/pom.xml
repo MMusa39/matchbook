@@ -36,6 +36,9 @@
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <configuration>
                     <protoc>${protobuf.version}</protoc>
+                    <!-- The incremental cache's rename races with IDE builds sharing target/; three small
+                         .proto files compile in well under a second anyway. -->
+                    <incrementalCompilation>false</incrementalCompilation>
                     <plugins>
                         <plugin kind="binary-maven">
                             <groupId>io.grpc</groupId>

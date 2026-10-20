@@ -57,7 +57,7 @@ services:
       # Each admitted request keeps ~460 bytes in Redis for the idempotency window (ADR-0012). The demo
       # stack keeps 10 minutes so sustained load tests fit in Redis; production sizes Redis for 24 h.
       IDEMPOTENCY_TTL: 10m
-    ports: ["8080:8080", "9091:9091"]
+    ports: ["8080:8080", "9091:9091", "9876:9876"]
     depends_on:
       engine: { condition: service_healthy }
       redis: { condition: service_healthy }

@@ -22,7 +22,8 @@ class RiskManagerTest {
 
     private final RiskManager risk = new RiskManager(new GatewayProperties("x", Duration.ofSeconds(1), "",
             Map.of(), new GatewayProperties.RateLimit(10, 1), Duration.ofHours(1),
-            new GatewayProperties.Risk(1_000, new BigDecimal("100000"), 1_500, new BigDecimal("5"))));
+            new GatewayProperties.Risk(1_000, new BigDecimal("100000"), 1_500, new BigDecimal("5")),
+            new GatewayProperties.Fix(false, 0, "MATCHBOOK")));
 
     @Test
     void rejectsOversizedOrders() {

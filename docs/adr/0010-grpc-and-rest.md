@@ -34,7 +34,11 @@ orders as they happen. Internally, the gateway and the market-data service talk 
 
 ## Alternatives considered
 
-- **FIX 4.4:** the industry standard for order entry. Listed as an optional extra: a QuickFIX/J
-  acceptor would sit next to the gRPC service and reuse `OrderService`.
+- **FIX 4.4 as the only protocol:** it is the industry standard for order entry, and the gateway does
+  speak it. A QuickFIX/J acceptor runs next to the gRPC and REST front ends and reuses the same
+  `OrderService`, so all three share admission, risk and idempotency (`FixGatewayIT`). gRPC stays the
+  primary API because its contracts are typed and generated, and it streams naturally. The FIX
+  sessions keep their message stores in memory and reset sequence numbers on logon; a production FIX
+  gateway would persist them and support resend requests.
 - **WebSocket JSON for order entry:** no schema and no generated clients; it is used for public market
   data instead (ADR-0014).

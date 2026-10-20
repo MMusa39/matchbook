@@ -15,6 +15,7 @@ spec:
     - { name: http, port: {{ $spec.port }}, targetPort: {{ $spec.port }} }
     {{- if $spec.extraPort }}
     - { name: grpc, port: {{ $spec.extraPort }}, targetPort: {{ $spec.extraPort }} }
+    - { name: fix, port: 9876, targetPort: 9876 }
     {{- end }}
 ---
 apiVersion: apps/v1
@@ -63,6 +64,7 @@ spec:
             - { name: http, containerPort: {{ $spec.port }} }
             {{- if $spec.extraPort }}
             - { name: grpc, containerPort: {{ $spec.extraPort }} }
+            - { name: fix, containerPort: 9876 }
             {{- end }}
           startupProbe:
             httpGet: { path: /actuator/health/liveness, port: http }

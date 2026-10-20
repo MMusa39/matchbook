@@ -75,12 +75,16 @@ public class ExecutionRouter {
                 .setCumQuantity(Long.toString(report.getCumQuantity()))
                 .setTradeId(report.getTradeId())
                 .setTimestamp(report.getTimestamp())
+                .setOrigClientOrderId(report.getOrigClOrdId() == 0 ? ""
+                        : externalId(report.getClientId(), report.getOrigClOrdId()))
+                .setOrderType(report.getOrderType())
+                .setTimeInForce(report.getTimeInForce())
                 .build();
         for (Consumer<ClientExecutionReport> session : targets) {
             try {
                 session.accept(message);
             } catch (RuntimeException e) {
-                LOG.debug("dropping failed execution stream for client {}", report.getClientId(), e);
+                LOG.warn("dropping failed execution stream for client {}", report.getClientId(), e);
                 targets.remove(session);
             }
         }
