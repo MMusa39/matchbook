@@ -180,11 +180,12 @@ class EngineServerTest {
         engine.submit(order(1, 1, Side.SIDE_BUY, 15_000, 10));
         engine.submit(order(1, 2, Side.SIDE_BUY, 1, 10));
         String scrape = awaitScrapeContaining("matchbook_engine_rejects_total");
-        assertThat(scrape).contains("matchbook_engine_commands_total{result=\"NEW\",shard=\"0\"}");
-        assertThat(scrape).contains("matchbook_engine_rejects_total{reason=\"PRICE_OUT_OF_BAND\",shard=\"0\"}");
+        assertThat(scrape).containsPattern("matchbook_engine_commands_total\\{[^}]*result=\"NEW\"[^}]*shard=\"0\"");
+        assertThat(scrape).containsPattern("matchbook_engine_rejects_total\\{[^}]*reason=\"PRICE_OUT_OF_BAND\"");
+        assertThat(scrape).contains("jvm_gc_pause_seconds").contains("application=\"engine\"");
         assertThat(scrape).contains("matchbook_engine_latency_seconds_bucket");
         assertThat(scrape).contains("matchbook_engine_match_seconds_bucket");
-        assertThat(scrape).contains("matchbook_engine_queue_depth{ring=\"inbound\",shard=\"0\"}");
+        assertThat(scrape).containsPattern("matchbook_engine_queue_depth\\{[^}]*ring=\"inbound\"");
     }
 
     private String awaitScrapeContaining(String text) {

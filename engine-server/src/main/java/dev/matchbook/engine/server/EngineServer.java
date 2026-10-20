@@ -18,6 +18,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +46,12 @@ public final class EngineServer implements AutoCloseable {
     private final CopyOnWriteArrayList<MarketDataStreams.Session> marketDataSessions = new CopyOnWriteArrayList<>();
     private final PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
     private final List<KafkaEventPublisher> kafkaPublishers = new ArrayList<>();
+    private final List<KafkaAckTracker> trackers = new ArrayList<>();
+    private final java.util.concurrent.ScheduledExecutorService ackPersister =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+                    Thread.ofPlatform().daemon().name("kafka-ack-persister").factory());
     private final HealthStatusManager health = new HealthStatusManager();
+    private final EngineTracing tracing = EngineTracing.fromEnvironment();
     private final Server grpc;
     private MetricsHttpServer metricsServer;
 
@@ -55,6 +62,11 @@ public final class EngineServer implements AutoCloseable {
     /** Builds on a caller-supplied server builder (tests use an in-process one). */
     public EngineServer(EngineServerConfig config, ServerBuilder<?> serverBuilder) {
         this.config = config;
+        registry.config().commonTags("application", "engine");
+        new io.micrometer.core.instrument.binder.jvm.JvmGcMetrics().bindTo(registry);
+        new io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics().bindTo(registry);
+        new io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics().bindTo(registry);
+        new io.micrometer.core.instrument.binder.system.ProcessorMetrics().bindTo(registry);
         AtomicLong correlationIds = new AtomicLong();
         Map<Integer, List<SymbolDefinition>> byShard = new TreeMap<>();
         for (SymbolDefinition s : config.symbols()) {
@@ -68,21 +80,32 @@ public final class EngineServer implements AutoCloseable {
             listeners.add(responses);
             listeners.add(new EventStreams(shardId, eventSubscribers));
             listeners.add(new MarketDataStreams(shardId, marketDataSessions));
+            KafkaAckTracker tracker = null;
             if (config.kafkaEnabled()) {
+                Path shardDir = config.dataDirectory().resolve("shard-" + shardId);
+                try {
+                    Files.createDirectories(shardDir);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                tracker = new KafkaAckTracker(shardDir.resolve("kafka-acked.seq"));
+                trackers.add(tracker);
                 KafkaEventPublisher kafka = new KafkaEventPublisher(shardId, config.kafkaBootstrapServers(),
-                        config.tradesTopic(), config.executionsTopic());
+                        config.tradesTopic(), config.executionsTopic(), tracker, tracing);
                 kafkaPublishers.add(kafka);
                 listeners.add(kafka);
             }
+            KafkaAckTracker floorSource = tracker;
             MetricsHolder metricsHolder = new MetricsHolder();
             listeners.add(metricsHolder);
             PipelineConfig pipelineConfig = PipelineConfig.defaults(
                             new EngineConfig(shardId, config.maxOrdersPerShard(), symbols),
                             config.dataDirectory().resolve("shard-" + shardId))
-                    .withWaitStrategies(config.waitStrategy(), config.waitStrategy())
+                    .withWaitStrategies(config.waitStrategy(), config.outboundWaitStrategy())
                     .withFsync(config.fsync())
                     .withSnapshotInterval(config.snapshotInterval())
-                    .withPretouchJournal(true);
+                    .withPretouchJournal(true)
+                    .withReplayFloor(floorSource == null ? () -> Long.MAX_VALUE : floorSource::persistedFloor);
             EnginePipeline pipeline = EnginePipeline.start(pipelineConfig, listeners);
             metricsHolder.delegate = new EngineMetrics(registry, shardId, pipeline);
             Shard shard = new Shard(shardId, pipeline, responses, entry.getValue());
@@ -108,6 +131,15 @@ public final class EngineServer implements AutoCloseable {
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+        if (!trackers.isEmpty()) {
+            ackPersister.scheduleWithFixedDelay(() -> trackers.forEach(t -> {
+                try {
+                    t.persist();
+                } catch (RuntimeException e) {
+                    LOG.warn("could not persist Kafka acked floor", e);
+                }
+            }), 200, 200, TimeUnit.MILLISECONDS);
         }
         health.setStatus("", HealthCheckResponse.ServingStatus.SERVING);
         LOG.info("engine gRPC on port {}, metrics on port {}", grpc.getPort(), config.metricsPort());
@@ -162,6 +194,9 @@ public final class EngineServer implements AutoCloseable {
         for (Shard shard : shards) {
             shard.pipeline().close();
         }
+        ackPersister.shutdownNow();
+        trackers.forEach(KafkaAckTracker::persist);
+        tracing.close();
         if (metricsServer != null) {
             metricsServer.close();
         }

@@ -19,9 +19,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * Publishes trades and execution reports to Kafka for post-trade processing.
  *
  * <p>Delivery is at-least-once. The producer is idempotent ({@code enable.idempotence}, {@code acks=all}),
- * which removes duplicates caused by producer retries within a session. Duplicates caused by an engine
- * restart (recovery replays and re-emits events) are removed by consumers, keyed on the event's
- * {@code (shard, seq)} carried in the {@code mb-shard} and {@code mb-seq} headers. See ADR-0013.
+ * which removes duplicates caused by producer retries within a session. Across engine restarts,
+ * {@link KafkaAckTracker} records how far Kafka has acknowledged, and recovery replays (re-sends) from
+ * there; consumers remove those duplicates by the event's {@code (shard, seq)}, carried in the
+ * {@code mb-shard} and {@code mb-seq} headers. See ADR-0013.
  *
  * <p>Records are keyed so that ordering holds where it matters: executions by client id (one client's
  * reports stay in order on one partition), trades by symbol id.
@@ -36,9 +37,17 @@ final class KafkaEventPublisher implements OutboundListener {
     private final KafkaProducer<String, byte[]> producer;
     private final AtomicLong sendErrors = new AtomicLong();
     private final AtomicLong sent = new AtomicLong();
+    private final KafkaAckTracker tracker;
+    private final EngineTracing tracing;
+    private io.opentelemetry.api.trace.Span commandSpan;
+    private String commandTraceparent;
+    private boolean firstOfCommand = true;
 
-    KafkaEventPublisher(int shard, String bootstrapServers, String tradesTopic, String executionsTopic) {
+    KafkaEventPublisher(int shard, String bootstrapServers, String tradesTopic, String executionsTopic,
+                        KafkaAckTracker tracker, EngineTracing tracing) {
         this.shard = shard;
+        this.tracker = tracker;
+        this.tracing = tracing;
         this.tradesTopic = tradesTopic;
         this.executionsTopic = executionsTopic;
         this.producer = new KafkaProducer<>(Map.of(
@@ -54,12 +63,27 @@ final class KafkaEventPublisher implements OutboundListener {
 
     @Override
     public void onEvent(OutboundEvent event, boolean endOfBatch) {
+        if (firstOfCommand) {
+            commandSpan = tracing.start(event, shard);
+            commandTraceparent = commandSpan != null ? EngineTracing.traceparent(commandSpan)
+                    : TraceContext.traceparent(event);
+        }
+        firstOfCommand = event.lastOfCommand();
         switch (event.type()) {
             case TRADE -> send(tradesTopic, Integer.toString(event.symbolId()), event,
                     ProtoMapping.trade(event, shard).toByteArray());
             case EXECUTION_REPORT -> send(executionsTopic, Long.toString(event.clientId()), event,
                     ProtoMapping.executionReport(event, shard).toByteArray());
             default -> {
+            }
+        }
+        if (event.lastOfCommand()) {
+            if (event.journalSeq() > 0) {
+                tracker.commandSent(event.journalSeq());
+            }
+            if (commandSpan != null) {
+                tracing.end(commandSpan);
+                commandSpan = null;
             }
         }
     }
@@ -69,18 +93,22 @@ final class KafkaEventPublisher implements OutboundListener {
         headers.add("mb-shard", Integer.toString(shard).getBytes(StandardCharsets.US_ASCII));
         headers.add("mb-seq", Long.toString(event.seq()).getBytes(StandardCharsets.US_ASCII));
         headers.add("mb-journal-seq", Long.toString(event.journalSeq()).getBytes(StandardCharsets.US_ASCII));
-        String traceparent = TraceContext.traceparent(event);
-        if (traceparent != null) {
-            headers.add("traceparent", traceparent.getBytes(StandardCharsets.US_ASCII));
+        long journalSeq = event.journalSeq();
+        tracker.sending(journalSeq);
+        // The engine span when tracing is exported, otherwise the caller's own context passes through.
+        if (commandTraceparent != null) {
+            headers.add("traceparent", commandTraceparent.getBytes(StandardCharsets.US_ASCII));
         }
         producer.send(new ProducerRecord<>(topic, null, event.timestamp() / 1_000_000, key, value, headers),
                 (metadata, error) -> {
                     if (error != null) {
+                        // Not acknowledged: the acked floor stays below this command, so a restart re-sends it.
                         if (sendErrors.incrementAndGet() % 1000 == 1) {
-                            LOG.error("Kafka send failed (shard {}, seq {})", shard, event.seq(), error);
+                            LOG.error("Kafka send failed (shard {}, journal seq {})", shard, journalSeq, error);
                         }
                     } else {
                         sent.incrementAndGet();
+                        tracker.acked(journalSeq);
                     }
                 });
     }
@@ -97,5 +125,6 @@ final class KafkaEventPublisher implements OutboundListener {
     public void onShutdown() {
         producer.flush();
         producer.close();
+        tracker.persist();
     }
 }
