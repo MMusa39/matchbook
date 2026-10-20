@@ -447,3 +447,23 @@ docker run --rm -v "$PWD/engine-bench/target/benchmarks.jar":/b.jar:ro -v "$PWD/
 - **Medians:** these are higher than on macOS (0.85 µs vs 0.75 µs), as expected for a VM.
 
 Raw: [`results/loadgen-linux/`](results/loadgen-linux/).
+
+## 9. Running-system checks (pass/fail, not timed)
+
+These were checked against the full Compose stack, with the market-making and noise-trading bots
+(`dev.matchbook.loadtest.bots.Bots`) generating flow.
+
+| Check | How | Result |
+|---|---|---|
+| The bots produce a realistic book | `GET /api/v1/book/AAPL` while they run | 3 levels a side quoted 0.10 apart; recent-trades buffer full (50) within 25 s |
+| Live order book page | `scripts/ui-smoke.mjs`: headless Chrome via Playwright | Sequence advances (278 246 → 278 380 in 3 s), 3 bid and 3 ask levels and the trade list render, switching symbol re-subscribes (MSFT best bid shown), **0 console errors** |
+| Every Grafana panel query has data | each `expr` in `dashboards/matchbook.json` evaluated against Prometheus | **24 of 24** queries returned series |
+| Grafana renders the dashboard | headless Chrome on `/d/matchbook-overview` | 18 panels, **0** "No data", **0** errors |
+| Trace across services | Jaeger API, during load | one trace: gateway HTTP + Redis spans → `engine.process` → post-trade Kafka consumer spans |
+| Engine state survives a Kubernetes pod deletion | kind: rest an order, `kubectl delete pod matchbook-engine-0`, cancel it after restart | final snapshot written on SIGTERM; recovered in 2 ms; cancel succeeded |
+
+Found and fixed by these checks:
+- the bid and ask depth columns were misaligned;
+- the browser's automatic `favicon.ico` request returned 404;
+- two dashboard queries showed duplicated Kafka topics, and engine rejects as if the gateway had made them.
+
