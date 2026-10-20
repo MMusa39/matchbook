@@ -51,7 +51,8 @@ public class OrderEntrySimulation extends Simulation {
         int mid = MID.get(symbol);
         boolean buy = r.nextBoolean();
         int passive = buy ? mid - 1 - r.nextInt(50) : mid + 1 + r.nextInt(50);
-        int aggressive = buy ? mid + 60 : mid - 60;
+        // The aggressive order is on the other side, priced through the opposite quotes so it trades.
+        int aggressive = buy ? mid - 60 : mid + 60;
         return Map.<String, Object>ofEntries(
                 Map.entry("apiKey", KEYS[r.nextInt(KEYS.length)]),
                 Map.entry("symbol", symbol),
