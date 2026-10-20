@@ -10,8 +10,15 @@ import java.util.List;
  * @param maxOrders  capacity of the order pool: the most live orders (resting plus the one being
  *                   matched) the engine holds. All of them are allocated up front.
  * @param symbols    the symbols this engine trades.
+ * @param pooling    {@code true} (the default) recycles {@link Order} objects through a pre-allocated
+ *                   pool. {@code false} allocates a new order per request and lets the GC reclaim it;
+ *                   it exists only so benchmarks can measure what pooling buys.
  */
-public record EngineConfig(int shardId, int maxOrders, List<SymbolConfig> symbols) {
+public record EngineConfig(int shardId, int maxOrders, List<SymbolConfig> symbols, boolean pooling) {
+
+    public EngineConfig(int shardId, int maxOrders, List<SymbolConfig> symbols) {
+        this(shardId, maxOrders, symbols, true);
+    }
 
     public static final int SHARD_SHIFT = 48;
 

@@ -53,7 +53,7 @@ public final class MatchingEngine {
         for (SymbolConfig symbol : config.symbols()) {
             books[symbol.symbolId()] = new OrderBook(symbol);
         }
-        this.pool = new OrderPool(config.maxOrders());
+        this.pool = new OrderPool(config.maxOrders(), config.pooling());
         // Sized so that holding every pooled order never triggers a resize (which would allocate).
         this.ordersById = new Long2ObjectHashMap<>(config.maxOrders() * 2, 0.6f);
     }
@@ -511,6 +511,11 @@ public final class MatchingEngine {
     /** A resting order by id, or {@code null}. */
     public Order restingOrder(long orderId) {
         return ordersById.get(orderId);
+    }
+
+    /** The id given to the most recently accepted order, or 0 if none yet. */
+    public long lastOrderId() {
+        return orderCounter == 0 ? 0 : idBase + orderCounter;
     }
 
     /** Sequence number of the last event emitted. */

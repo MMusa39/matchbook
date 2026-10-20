@@ -101,8 +101,17 @@ class MatchingEnginePropertiesTest {
         Statistics.label("spans words").coverage(c -> c.check(true).percentage(p -> p > 80));
     }
 
+    @Property(tries = 100)
+    void pooledAndUnpooledEnginesBehaveIdentically(@ForAll("commands") List<Spec> specs) {
+        EngineConfig unpooled = new EngineConfig(0, 10_000, List.of(EngineDriver.testSymbol(EngineDriver.SYMBOL)), false);
+        assertThat(replayToText(specs, new EngineDriver(unpooled))).isEqualTo(replayToText(specs));
+    }
+
     static List<String> replayToText(List<Spec> specs) {
-        EngineDriver driver = new EngineDriver();
+        return replayToText(specs, new EngineDriver());
+    }
+
+    static List<String> replayToText(List<Spec> specs, EngineDriver driver) {
         List<String> out = new ArrayList<>();
         List<Long> ids = new ArrayList<>();
         Map<Long, Integer> owners = new HashMap<>();
