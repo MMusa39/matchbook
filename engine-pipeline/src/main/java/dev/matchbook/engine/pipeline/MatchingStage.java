@@ -56,10 +56,11 @@ final class MatchingStage implements EventHandler<InboundSlot> {
                 long start = System.nanoTime();
                 sink.beginCommand(slot, start);
                 engine.process(slot.command);
-                sink.endCommand();
+                long end = System.nanoTime();
+                sink.endCommand(end);
                 lastAppliedJournalSeq = slot.journalSeq;
                 metrics.commandsMatched++;
-                metrics.matchNanosTotal += System.nanoTime() - start;
+                metrics.matchNanosTotal += end - start;
             }
             case SNAPSHOT -> snapshot(slot.snapshotRequest);
             case BOOK_IMAGE -> bookImage(slot);

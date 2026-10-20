@@ -41,6 +41,8 @@ public final class OutboundEvent {
     long correlationId;
     long ingressNanos;
     long matchNanos;
+    /** When the matching stage finished the command; set on the command's last event only. */
+    long matchEndNanos;
     long traceIdHigh;
     long traceIdLow;
     long spanId;
@@ -92,6 +94,7 @@ public final class OutboundEvent {
         this.correlationId = slot.correlationId;
         this.ingressNanos = slot.ingressNanos;
         this.matchNanos = matchNanos;
+        this.matchEndNanos = 0;
         this.traceIdHigh = slot.traceIdHigh;
         this.traceIdLow = slot.traceIdLow;
         this.spanId = slot.spanId;
@@ -182,6 +185,11 @@ public final class OutboundEvent {
 
     public long matchNanos() {
         return matchNanos;
+    }
+
+    /** End of matching for this command, on the last event of the command; 0 otherwise. */
+    public long matchEndNanos() {
+        return matchEndNanos;
     }
 
     public long traceIdHigh() {

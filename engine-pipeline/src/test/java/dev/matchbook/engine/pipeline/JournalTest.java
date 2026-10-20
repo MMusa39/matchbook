@@ -51,13 +51,17 @@ class JournalTest {
     }
 
     @Test
-    void rollsAcrossSegmentsAndReplaysInOrder() {
+    void rollsAcrossSegmentsAndReplaysInOrder() throws IOException {
         List<String> written;
         try (Journal journal = Journal.open(dir, SMALL_SEGMENT, FsyncPolicy.NONE)) {
             written = append(journal, 5_000);
         }
         assertThat(JournalFormat.segments(dir)).hasSizeGreaterThan(5);
         assertThat(replay(dir, 0)).isEqualTo(written);
+        try (var files = Files.list(dir)) {
+            assertThat(files.map(p -> p.getFileName().toString()))
+                    .as("the prepared-but-unused next segment is removed on close").noneMatch(n -> n.endsWith(".tmp"));
+        }
         JournalReader.ScanResult scan = JournalReader.replay(dir, 0, (s, c) -> { });
         assertThat(scan.lastSeq()).isEqualTo(5_000);
         assertThat(scan.torn()).isFalse();

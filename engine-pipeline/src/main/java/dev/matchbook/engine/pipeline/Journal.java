@@ -10,7 +10,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 import java.util.zip.CRC32C;
 
 /**
@@ -25,7 +31,11 @@ import java.util.zip.CRC32C;
  * or {@code Unsafe}: the mapping is released deterministically when the arena closes instead of
  * whenever the GC collects a buffer, and no {@code --add-opens} or {@code --add-exports} flags are
  * needed. Segments are limited to 2 GiB because the CRC is computed through a {@link ByteBuffer} view.
- * See ADR-0005.
+ *
+ * <p>The next segment is created, mapped and (with pretouch) pre-faulted by a background thread while
+ * the current one fills, so a roll on the journal thread is a rename and a pointer swap. Rolling
+ * synchronously used to stall the journal thread for 100 ms+ on a 1 GiB segment, which back-pressured
+ * the whole pipeline (RESULTS §3). See ADR-0005.
  */
 public final class Journal implements AutoCloseable {
 
@@ -44,7 +54,16 @@ public final class Journal implements AutoCloseable {
     private long syncedPosition;
     private long lastSeq;
     private long flushes;
-    private boolean pretouch;
+    private volatile boolean pretouch;
+
+    /** A mapped segment file prepared ahead of time under a temporary name. */
+    private record Mapping(Path path, FileChannel channel, Arena arena, MemorySegment segment) {
+    }
+
+    private static final String NEXT_PREFIX = "journal-next-";
+    private ExecutorService preparer;
+    private CompletableFuture<Mapping> next;
+    private int prepared;
 
     private Journal(Path directory, long segmentBytes, FsyncPolicy fsync) {
         this.directory = directory;
@@ -67,6 +86,10 @@ public final class Journal implements AutoCloseable {
     }
 
     private void touchFrom(long from) {
+        touch(segment, from);
+    }
+
+    private static void touch(MemorySegment segment, long from) {
         long page = 4096;
         for (long offset = (from + page - 1) / page * page; offset < segment.byteSize(); offset += page) {
             // Re-writing the existing byte (zero in a fresh segment) faults the page in without changing data.
@@ -96,6 +119,7 @@ public final class Journal implements AutoCloseable {
             throw new UncheckedIOException(e);
         }
         Journal journal = new Journal(directory, segmentBytes, fsync);
+        deleteLeftoverNextSegments(directory);
         JournalReader.ScanResult scan = JournalReader.scanTail(directory);
         if (scan.torn()) {
             LOG.log(System.Logger.Level.WARNING, "journal tail damaged after seq {0}; truncating there", scan.lastSeq());
@@ -129,6 +153,16 @@ public final class Journal implements AutoCloseable {
         return journal;
     }
 
+    private static void deleteLeftoverNextSegments(Path directory) {
+        try (Stream<Path> files = Files.list(directory)) {
+            for (Path p : files.filter(f -> f.getFileName().toString().startsWith(NEXT_PREFIX)).toList()) {
+                Files.deleteIfExists(p);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static long segmentBytesOf(Path segment, long configured) {
         try {
             return Math.max(Files.size(segment), configured);
@@ -141,6 +175,9 @@ public final class Journal implements AutoCloseable {
     public long append(Command command) {
         if (position + JournalFormat.RECORD_LENGTH + Integer.BYTES > segment.byteSize()) {
             roll();
+        }
+        if (next == null) {
+            prepareNext();
         }
         long seq = ++lastSeq;
         long payloadOffset = position + JournalFormat.HEADER_LENGTH;
@@ -179,10 +216,85 @@ public final class Journal implements AutoCloseable {
         if (fsync == FsyncPolicy.EVERY_BATCH) {
             segment.force();
         }
-        unmap();
-        map(JournalFormat.segmentPath(directory, lastSeq + 1), 0);
-        if (pretouch) {
-            touchFrom(0);
+        Path target = JournalFormat.segmentPath(directory, lastSeq + 1);
+        Mapping ready = takeNext();
+        if (ready == null) {
+            unmap();
+            map(target, 0);
+            if (pretouch) {
+                touchFrom(0);
+            }
+            return;
+        }
+        try {
+            // The mapping stays valid across the rename; only the name changes.
+            Files.move(ready.path(), target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        // Unmapping a large resident segment (munmap of every page) is slow too: do it off this thread.
+        FileChannel oldChannel = channel;
+        Arena oldArena = arena;
+        preparer.execute(() -> {
+            try {
+                oldArena.close();
+                oldChannel.close();
+            } catch (IOException | RuntimeException e) {
+                LOG.log(System.Logger.Level.WARNING, "closing a full journal segment failed", e);
+            }
+        });
+        channel = ready.channel();
+        arena = ready.arena();
+        segment = ready.segment();
+        crcView = segment.asByteBuffer();
+        position = 0;
+        syncedPosition = 0;
+        prepareNext();
+    }
+
+    /** Starts creating the next segment in the background. */
+    private void prepareNext() {
+        if (preparer == null) {
+            preparer = Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "journal-preparer");
+                t.setDaemon(true);
+                return t;
+            });
+        }
+        Path path = directory.resolve(NEXT_PREFIX + (prepared++) + ".tmp");
+        boolean touch = pretouch;
+        next = CompletableFuture.supplyAsync(() -> {
+            try {
+                FileChannel ch = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.READ,
+                        StandardOpenOption.WRITE);
+                Arena a = Arena.ofShared();
+                MemorySegment seg = ch.map(FileChannel.MapMode.READ_WRITE, 0, segmentBytes, a);
+                if (touch) {
+                    touch(seg, 0);
+                }
+                return new Mapping(path, ch, a, seg);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }, preparer);
+    }
+
+    /** The prepared next segment, waiting for it if necessary; {@code null} if preparing failed. */
+    private Mapping takeNext() {
+        CompletableFuture<Mapping> future = next;
+        next = null;
+        if (future == null) {
+            return null;
+        }
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (ExecutionException e) {
+            LOG.log(System.Logger.Level.WARNING, "preparing the next journal segment failed; mapping inline",
+                    e.getCause());
+            return null;
         }
     }
 
@@ -218,5 +330,18 @@ public final class Journal implements AutoCloseable {
     public void close() {
         endOfBatch();
         unmap();
+        Mapping unused = takeNext();
+        if (unused != null) {
+            try {
+                unused.arena().close();
+                unused.channel().close();
+                Files.deleteIfExists(unused.path());
+            } catch (IOException e) {
+                LOG.log(System.Logger.Level.WARNING, "could not remove prepared segment " + unused.path(), e);
+            }
+        }
+        if (preparer != null) {
+            preparer.shutdownNow();
+        }
     }
 }

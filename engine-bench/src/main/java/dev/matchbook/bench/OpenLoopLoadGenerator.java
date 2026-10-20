@@ -116,6 +116,10 @@ public final class OpenLoopLoadGenerator {
         long measureStart = start + warmupCommands * interval;
         listener.measureFromIntended = measureStart;
         long maxBehind = 0;
+        long maxPublish = 0;
+        long blockedNanos = 0;
+        long maxInboundDepth = 0;
+        long maxOutboundDepth = 0;
         for (long i = 0; i < total; i++) {
             long intended = start + i * interval;
             if (i == warmupCommands) {
@@ -128,6 +132,15 @@ public final class OpenLoopLoadGenerator {
             }
             maxBehind = Math.max(maxBehind, now - intended);
             pipeline.publish(flow.next(command, i + 1), now, intended);
+            long took = System.nanoTime() - now;
+            maxPublish = Math.max(maxPublish, took);
+            if (took > 10_000) {
+                blockedNanos += took; // ring was full: back-pressure from the pipeline
+            }
+            if ((i & 1023) == 0) {
+                maxInboundDepth = Math.max(maxInboundDepth, pipeline.inboundDepth());
+                maxOutboundDepth = Math.max(maxOutboundDepth, pipeline.outboundDepth());
+            }
         }
         long sendEnd = System.nanoTime();
         while (listener.completed < total) {
@@ -148,7 +161,8 @@ public final class OpenLoopLoadGenerator {
                         + "  response time (from intended send, CO-corrected) us: p50=%.2f p90=%.2f p99=%.2f p99.9=%.2f p99.99=%.2f max=%.2f n=%d%n"
                         + "  service time  (from actual send, naive)          us: p50=%.2f p90=%.2f p99=%.2f p99.9=%.2f p99.99=%.2f max=%.2f%n"
                         + "  producer max lag behind schedule: %.2f us; gc during measurement: %d collections, %d ms; "
-                        + "process cpu: %.2f cores%n",
+                        + "process cpu: %.2f cores%n"
+                        + "  publish: max %.2f us, blocked on full ring %.1f ms total; max ring depth inbound %d, outbound %d%n",
                 o.label(), o.rate(), listener.responseTime.getTotalCount() / measuredSeconds, o.durationSeconds(),
                 o.waitStrategy(), o.outboundWait(), o.fsync(), o.pooling(), o.pretouch(), gcNames(),
                 us(listener.responseTime, 50), us(listener.responseTime, 90), us(listener.responseTime, 99),
@@ -158,7 +172,8 @@ public final class OpenLoopLoadGenerator {
                 us(listener.serviceTime, 99.9), us(listener.serviceTime, 99.99),
                 listener.serviceTime.getMaxValue() / 1000.0,
                 maxBehind / 1000.0, gcAfter.count - gcBefore.count, gcAfter.millis - gcBefore.millis,
-                cpuUsed / 1e9 / measuredSeconds);
+                cpuUsed / 1e9 / measuredSeconds,
+                maxPublish / 1000.0, blockedNanos / 1e6, maxInboundDepth, maxOutboundDepth);
         System.out.print(summary);
         Files.writeString(o.output().resolve(o.label() + ".txt"), summary);
         deleteRecursively(o.dataDirectory());

@@ -33,8 +33,15 @@ final class OutboundSink implements EventSink {
 
     /** Publishes the held-back event, flagged as the command's last. */
     void endCommand() {
+        endCommand(0);
+    }
+
+    /** As {@link #endCommand()}, also stamping when matching finished. */
+    void endCommand(long matchEndNanos) {
         if (pending >= 0) {
-            ring.get(pending).lastOfCommand = true;
+            OutboundEvent last = ring.get(pending);
+            last.lastOfCommand = true;
+            last.matchEndNanos = matchEndNanos;
             ring.publish(pending);
             pending = -1;
         }
