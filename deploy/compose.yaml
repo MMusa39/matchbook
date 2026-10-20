@@ -54,6 +54,9 @@ services:
       # Generous per-client limits so the Gatling profile measures latency, not the rate limiter.
       RATE_LIMIT_CAPACITY: "2000"
       RATE_LIMIT_REFILL: "1000"
+      # Each admitted request keeps ~460 bytes in Redis for the idempotency window (ADR-0012). The demo
+      # stack keeps 10 minutes so sustained load tests fit in Redis; production sizes Redis for 24 h.
+      IDEMPOTENCY_TTL: 10m
     ports: ["8080:8080", "9091:9091"]
     depends_on:
       engine: { condition: service_healthy }
@@ -111,7 +114,7 @@ services:
   redis:
     image: redis:8.8.3-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
     ports: ["6379:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

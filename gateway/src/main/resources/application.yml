@@ -50,7 +50,7 @@ matchbook:
   rate-limit:
     capacity: ${RATE_LIMIT_CAPACITY:100}
     refill-per-second: ${RATE_LIMIT_REFILL:50}
-  idempotency-ttl: 24h
+  idempotency-ttl: ${IDEMPOTENCY_TTL:24h}
   risk:
     max-order-quantity: 100000
     max-notional: 5000000
