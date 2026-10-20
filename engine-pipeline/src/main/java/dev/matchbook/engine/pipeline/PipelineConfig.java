@@ -25,6 +25,10 @@ import java.time.Duration;
  * @param journalCpu           CPU to pin the journal thread to, or -1 (Linux only, see ADR-0009)
  * @param matchingCpu          CPU to pin the matching thread to, or -1
  * @param pretouchJournal      pre-fault journal pages when a segment is mapped (see {@link Journal#pretouch})
+ * @param replayFloor          journal sequence up to which every downstream consumer has durably received
+ *                             the events; recovery replays (and re-emits) everything after it, and pruning
+ *                             keeps what that requires. {@code () -> Long.MAX_VALUE} when nothing downstream
+ *                             needs replays. See ADR-0013.
  */
 public record PipelineConfig(
         EngineConfig engine,
@@ -40,7 +44,8 @@ public record PipelineConfig(
         int snapshotsToKeep,
         int journalCpu,
         int matchingCpu,
-        boolean pretouchJournal) {
+        boolean pretouchJournal,
+        java.util.function.LongSupplier replayFloor) {
 
     public PipelineConfig {
         if (Integer.bitCount(inboundRingSize) != 1 || Integer.bitCount(outboundRingSize) != 1) {
@@ -61,42 +66,48 @@ public record PipelineConfig(
     /** Defaults suitable for tests and local runs: yielding waits, no fsync, no pinning. */
     public static PipelineConfig defaults(EngineConfig engine, Path dataDirectory) {
         return new PipelineConfig(engine, dataDirectory, 1 << 14, 1 << 16, WaitStrategyType.YIELDING,
-                WaitStrategyType.YIELDING, true, FsyncPolicy.NONE, 64L * 1024 * 1024, Duration.ZERO, 3, -1, -1, false);
+                WaitStrategyType.YIELDING, true, FsyncPolicy.NONE, 64L * 1024 * 1024, Duration.ZERO, 3, -1, -1, false, () -> Long.MAX_VALUE);
     }
 
     public PipelineConfig withWaitStrategies(WaitStrategyType inbound, WaitStrategyType outbound) {
         return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inbound, outbound,
-                multiProducer, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal);
+                multiProducer, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal, replayFloor);
     }
 
     public PipelineConfig withFsync(FsyncPolicy policy) {
         return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inboundWait, outboundWait,
-                multiProducer, policy, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal);
+                multiProducer, policy, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal, replayFloor);
     }
 
     public PipelineConfig withSnapshotInterval(Duration interval) {
         return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inboundWait, outboundWait,
-                multiProducer, fsync, journalSegmentBytes, interval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal);
+                multiProducer, fsync, journalSegmentBytes, interval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal, replayFloor);
     }
 
     public PipelineConfig withJournalSegmentBytes(long bytes) {
         return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inboundWait, outboundWait,
-                multiProducer, fsync, bytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal);
+                multiProducer, fsync, bytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal, replayFloor);
     }
 
     public PipelineConfig withProducer(boolean multi) {
         return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inboundWait, outboundWait,
-                multi, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal);
+                multi, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu, pretouchJournal, replayFloor);
     }
 
     public PipelineConfig withPretouchJournal(boolean enabled) {
         return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inboundWait, outboundWait,
                 multiProducer, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu,
-                enabled);
+                enabled, replayFloor);
+    }
+
+    public PipelineConfig withReplayFloor(java.util.function.LongSupplier floor) {
+        return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inboundWait, outboundWait,
+                multiProducer, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journalCpu, matchingCpu,
+                pretouchJournal, floor);
     }
 
     public PipelineConfig withCpus(int journal, int matching) {
         return new PipelineConfig(engine, dataDirectory, inboundRingSize, outboundRingSize, inboundWait, outboundWait,
-                multiProducer, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journal, matching, pretouchJournal);
+                multiProducer, fsync, journalSegmentBytes, snapshotInterval, snapshotsToKeep, journal, matching, pretouchJournal, replayFloor);
     }
 }

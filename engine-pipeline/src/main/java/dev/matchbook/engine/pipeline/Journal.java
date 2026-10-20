@@ -348,6 +348,10 @@ public final class Journal implements AutoCloseable {
                 Thread.currentThread().interrupt();
             }
         }
-        deleteLeftoverNextSegments(directory);
+        try {
+            deleteLeftoverNextSegments(directory);
+        } catch (UncheckedIOException e) {
+            LOG.log(System.Logger.Level.DEBUG, "could not clean up prepared segments in " + directory, e);
+        }
     }
 }

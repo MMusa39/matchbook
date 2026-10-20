@@ -33,10 +33,20 @@ final class SnapshotStore {
 
     private final Path directory;
     private final int keep;
+    private final java.util.function.LongSupplier replayFloor;
 
     SnapshotStore(Path directory, int keep) {
+        this(directory, keep, () -> Long.MAX_VALUE);
+    }
+
+    /**
+     * @param replayFloor recovery must be able to replay everything after this journal sequence, so the
+     *                    newest snapshot at or below it, and the journal after that snapshot, are never pruned
+     */
+    SnapshotStore(Path directory, int keep, java.util.function.LongSupplier replayFloor) {
         this.directory = directory;
         this.keep = keep;
+        this.replayFloor = replayFloor;
     }
 
     void write(Snapshot snapshot) {
@@ -66,7 +76,15 @@ final class SnapshotStore {
 
     /** The newest snapshot that passes validation, if any. */
     Optional<Snapshot> latest() {
+        return latestAtOrBelow(Long.MAX_VALUE);
+    }
+
+    /** The newest valid snapshot whose journal sequence is at most {@code maxSeq}. */
+    Optional<Snapshot> latestAtOrBelow(long maxSeq) {
         for (Path file : files().reversed()) {
+            if (seqOf(file) > maxSeq) {
+                continue;
+            }
             try {
                 Optional<Snapshot> loaded = read(file);
                 if (loaded.isPresent()) {
@@ -107,12 +125,25 @@ final class SnapshotStore {
 
     private void prune() {
         List<Path> files = files();
-        for (int i = 0; i < files.size() - keep; i++) {
-            delete(files.get(i));
+        long floor = replayFloor.getAsLong();
+        // The newest snapshot at or below the replay floor is where recovery would start: always keep it.
+        Path floorSnapshot = null;
+        for (Path f : files) {
+            if (seqOf(f) <= floor) {
+                floorSnapshot = f;
+            }
         }
-        List<Path> kept = files.subList(Math.max(0, files.size() - keep), files.size());
-        if (kept.isEmpty()) {
-            return;
+        List<Path> kept = new java.util.ArrayList<>();
+        for (int i = 0; i < files.size(); i++) {
+            Path f = files.get(i);
+            if (i >= files.size() - keep || f.equals(floorSnapshot)) {
+                kept.add(f);
+            } else {
+                delete(f);
+            }
+        }
+        if (kept.isEmpty() || floorSnapshot == null) {
+            return; // recovery may need the whole journal
         }
         long oldestKeptSeq = seqOf(kept.getFirst());
         // A segment is fully covered when the next segment starts at or before oldestKeptSeq + 1.

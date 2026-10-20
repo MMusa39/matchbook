@@ -85,9 +85,10 @@ public final class EnginePipeline implements AutoCloseable {
 
         OutboundSink sink = new OutboundSink(outboundRing);
         this.engine = new MatchingEngine(config.engine(), sink);
-        SnapshotStore store = new SnapshotStore(config.dataDirectory(), config.snapshotsToKeep());
+        SnapshotStore store = new SnapshotStore(config.dataDirectory(), config.snapshotsToKeep(), config.replayFloor());
 
-        long snapshotSeqForJournal = store.latest().map(Snapshot::journalSeq).orElse(0L);
+        long snapshotSeqForJournal = store.latestAtOrBelow(config.replayFloor().getAsLong())
+                .map(Snapshot::journalSeq).orElse(0L);
         this.journal = Journal.open(config.dataDirectory(), config.journalSegmentBytes(), config.fsync(),
                 snapshotSeqForJournal).pretouch(config.pretouchJournal());
         // Where the journal ends now; nothing can be appended until start() returns.
@@ -156,7 +157,9 @@ public final class EnginePipeline implements AutoCloseable {
     private RecoveryInfo recover(SnapshotStore store, OutboundSink sink, long journalEnd) {
         long start = System.nanoTime();
         long snapshotSeq = 0;
-        Optional<Snapshot> snapshot = store.latest();
+        // Start from the newest snapshot that downstream consumers have fully received, so every event they
+        // may have missed is re-emitted by the replay.
+        Optional<Snapshot> snapshot = store.latestAtOrBelow(config.replayFloor().getAsLong());
         if (snapshot.isPresent()) {
             byte[] state = snapshot.get().state();
             EngineSnapshot.read(engine, ByteBuffer.wrap(state), 0, state.length);
