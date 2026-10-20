@@ -1,0 +1,172 @@
+syntax = "proto3";
+
+package matchbook.v1;
+
+import "matchbook/v1/common.proto";
+
+option java_multiple_files = true;
+option java_package = "dev.matchbook.proto.v1";
+option java_outer_classname = "EngineProto";
+
+// Internal API of the matching engine, used by the gateway and the market data service.
+// Prices and quantities are fixed-point int64 in the symbol's minimum units (see ADR-0003); symbols
+// are numeric ids. Converting from client-friendly decimals and names is the gateway's job.
+service MatchingEngine {
+  // Submits one command. Completes once the engine has processed it, returning every event the
+  // command produced for its sender (the first response, plus the incoming order's own fills).
+  rpc Submit(EngineCommand) returns (EngineResult);
+
+  // All private execution reports and public trades, for gateways that track risk and route
+  // reports to client sessions. Starts from "now"; see StreamEventsRequest.
+  rpc StreamEvents(StreamEventsRequest) returns (stream EngineEvent);
+
+  // Public market data: a book image per symbol, then L2/L1/trade incrementals.
+  rpc StreamMarketData(MarketDataRequest) returns (stream MarketDataEvent);
+}
+
+message EngineCommand {
+  oneof command {
+    NewOrder new_order = 1;
+    Cancel cancel = 2;
+    Replace replace = 3;
+  }
+  // W3C trace context of the caller, carried through the engine's rings into Kafka headers.
+  string traceparent = 10;
+}
+
+message NewOrder {
+  int64 client_id = 1;
+  int64 cl_ord_id = 2;
+  int32 symbol_id = 3;
+  Side side = 4;
+  OrderType order_type = 5;
+  TimeInForce time_in_force = 6;
+  StpMode stp_mode = 7;
+  int64 price = 8;
+  int64 quantity = 9;
+}
+
+message Cancel {
+  int64 client_id = 1;
+  int64 cl_ord_id = 2;
+  int32 symbol_id = 3;
+  int64 order_id = 4;
+}
+
+message Replace {
+  int64 client_id = 1;
+  int64 cl_ord_id = 2;
+  int32 symbol_id = 3;
+  int64 order_id = 4;
+  int64 price = 5;
+  // New total order quantity, including what has already filled (FIX OrderQty semantics).
+  int64 quantity = 6;
+}
+
+message EngineResult {
+  // Execution reports for the command's own order, in engine order. The first one is the
+  // response: NEW / REJECTED / CANCELED / CANCEL_REJECTED / REPLACED / REPLACE_REJECTED.
+  repeated ExecutionReport reports = 1;
+  // Trades the command caused.
+  repeated Trade trades = 2;
+  int64 journal_seq = 3;
+}
+
+message ExecutionReport {
+  int64 seq = 1;
+  int32 shard = 2;
+  int64 timestamp = 3;
+  ExecType exec_type = 4;
+  string reason = 5;
+  int64 order_id = 6;
+  int64 client_id = 7;
+  int64 cl_ord_id = 8;
+  int64 orig_cl_ord_id = 9;
+  int32 symbol_id = 10;
+  Side side = 11;
+  OrderType order_type = 12;
+  TimeInForce time_in_force = 13;
+  int64 price = 14;
+  int64 quantity = 15;
+  int64 last_price = 16;
+  int64 last_quantity = 17;
+  int64 leaves_quantity = 18;
+  int64 cum_quantity = 19;
+  int64 trade_id = 20;
+  Liquidity liquidity = 21;
+}
+
+message Trade {
+  int64 seq = 1;
+  int32 shard = 2;
+  int64 symbol_seq = 3;
+  int64 timestamp = 4;
+  int64 trade_id = 5;
+  int32 symbol_id = 6;
+  int64 price = 7;
+  int64 quantity = 8;
+  Side aggressor_side = 9;
+  int64 buy_order_id = 10;
+  int64 sell_order_id = 11;
+  int64 buy_client_id = 12;
+  int64 sell_client_id = 13;
+}
+
+message StreamEventsRequest {
+  string subscriber = 1;
+}
+
+message EngineEvent {
+  oneof event {
+    ExecutionReport execution_report = 1;
+    Trade trade = 2;
+  }
+}
+
+message MarketDataRequest {
+  string subscriber = 1;
+}
+
+message BookLevel {
+  int64 price = 1;
+  int64 quantity = 2;
+  int32 order_count = 3;
+}
+
+// A full depth image of one symbol at symbol_seq. Incrementals with symbol_seq greater than this
+// follow on the same stream.
+message BookImage {
+  int32 symbol_id = 1;
+  int64 symbol_seq = 2;
+  repeated BookLevel bids = 3;  // best first
+  repeated BookLevel asks = 4;  // best first
+}
+
+message LevelUpdate {
+  int32 symbol_id = 1;
+  int64 symbol_seq = 2;
+  Side side = 3;
+  int64 price = 4;
+  int64 quantity = 5;   // 0 = level removed
+  int32 order_count = 6;
+  int64 timestamp = 7;
+}
+
+message TopOfBook {
+  int32 symbol_id = 1;
+  int64 symbol_seq = 2;
+  int64 bid_price = 3;
+  int64 bid_quantity = 4;
+  int64 ask_price = 5;
+  int64 ask_quantity = 6;
+  int64 timestamp = 7;
+}
+
+message MarketDataEvent {
+  oneof event {
+    BookImage image = 1;
+    LevelUpdate level = 2;
+    TopOfBook top = 3;
+    Trade trade = 4;
+  }
+}

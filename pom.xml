@@ -13,9 +13,11 @@
     <description>Low-latency exchange: matching engine, gateway, market data and post-trade</description>
 
     <modules>
+        <module>proto</module>
         <module>engine-core</module>
         <module>engine-pipeline</module>
         <module>engine-bench</module>
+        <module>engine-server</module>
     </modules>
 
     <properties>
@@ -26,6 +28,12 @@
 
         <!-- Spring-managed versions (JUnit, AssertJ, Mockito, Testcontainers, Kafka, gRPC, ...) come from this BOM -->
         <spring-boot.version>4.1.1</spring-boot.version>
+
+        <!-- Kept equal to the versions Spring Boot ${spring-boot.version} manages, for the protoc plugins -->
+        <protobuf.version>4.35.1</protobuf.version>
+        <grpc.version>1.83.1</grpc.version>
+        <protobuf-maven-plugin.version>5.1.11</protobuf-maven-plugin.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
 
         <!-- Engine libraries (not managed by Spring Boot) -->
         <agrona.version>2.7.0</agrona.version>
@@ -72,6 +80,23 @@
                 <groupId>dev.matchbook</groupId>
                 <artifactId>engine-pipeline</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.matchbook</groupId>
+                <artifactId>proto</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.matchbook</groupId>
+                <artifactId>engine-server</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-bom</artifactId>
+                <version>${resilience4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <dependency>
@@ -186,6 +211,11 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>io.github.ascopes</groupId>
+                    <artifactId>protobuf-maven-plugin</artifactId>
+                    <version>${protobuf-maven-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

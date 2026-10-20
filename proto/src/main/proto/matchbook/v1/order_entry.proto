@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package matchbook.v1;
+
+import "matchbook/v1/common.proto";
+
+option java_multiple_files = true;
+option java_package = "dev.matchbook.proto.v1";
+option java_outer_classname = "OrderEntryProto";
+
+// Public order-entry API of the gateway. Clients authenticate with an "x-api-key" metadata header.
+// Prices and quantities are decimal strings ("101.25") so no client ever sends a binary float;
+// the gateway converts them with the symbol's scale and rejects anything off the tick or lot grid.
+service OrderEntry {
+  rpc SubmitOrder(SubmitOrderRequest) returns (OrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (OrderResponse);
+  rpc ReplaceOrder(ReplaceOrderRequest) returns (OrderResponse);
+  // Execution reports for the authenticated client's orders, including fills of resting orders.
+  rpc StreamExecutions(StreamExecutionsRequest) returns (stream ClientExecutionReport);
+}
+
+message SubmitOrderRequest {
+  // Client order id: unique per client. Re-sending the same id returns the original response
+  // instead of placing a second order (idempotency, ADR-0012).
+  string client_order_id = 1;
+  string symbol = 2;
+  Side side = 3;
+  OrderType order_type = 4;
+  TimeInForce time_in_force = 5;
+  string price = 6;      // required for LIMIT, ignored for MARKET
+  string quantity = 7;
+  StpMode stp_mode = 8;
+}
+
+message CancelOrderRequest {
+  string client_order_id = 1;  // id of this cancel request
+  string symbol = 2;
+  int64 order_id = 3;
+}
+
+message ReplaceOrderRequest {
+  string client_order_id = 1;  // becomes the order's client order id
+  string symbol = 2;
+  int64 order_id = 3;
+  string price = 4;
+  string quantity = 5;         // new total quantity, including any filled quantity
+}
+
+message OrderResponse {
+  bool accepted = 1;
+  int64 order_id = 2;
+  string status = 3;           // NEW, FILLED, PARTIALLY_FILLED, CANCELED, REPLACED, REJECTED, ...
+  string reject_reason = 4;    // engine or gateway reason when not accepted
+  string filled_quantity = 5;
+  string leaves_quantity = 6;
+  repeated Fill fills = 7;
+  bool replayed = 8;           // true when returned from the idempotency cache
+}
+
+message Fill {
+  int64 trade_id = 1;
+  string price = 2;
+  string quantity = 3;
+  Liquidity liquidity = 4;
+}
+
+message StreamExecutionsRequest {
+}
+
+message ClientExecutionReport {
+  int64 seq = 1;
+  string client_order_id = 2;
+  int64 order_id = 3;
+  string symbol = 4;
+  ExecType exec_type = 5;
+  string reason = 6;
+  Side side = 7;
+  string price = 8;
+  string quantity = 9;
+  string last_price = 10;
+  string last_quantity = 11;
+  string leaves_quantity = 12;
+  string cum_quantity = 13;
+  int64 trade_id = 14;
+  int64 timestamp = 15;
+}
