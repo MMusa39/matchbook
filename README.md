@@ -145,6 +145,7 @@ commands are in [`docs/RESULTS.md`](docs/RESULTS.md).
 | Allocation on the matching path (JMH `-prof gc`) | **≈ 0 B/op** pooled, vs 56–112 B/op unpooled; enforced in CI |
 | Full pipeline latency, journal + match + hand-offs, open-loop and coordinated-omission corrected, at 1 M commands/s | **p50 0.63 µs, p99 51 µs** (median of 3 runs) |
 | Pooling vs not, at 1 M commands/s with G1 | p99 **55 µs vs 1.47 ms** |
+| Shard scaling, engine only (share-nothing, JMH) | **135 M commands/s on 4 shards**, linear from 2 to 4; full pipeline saturates one shard at 10.8 M/s and does not scale further on this laptop's 4 performance cores (RESULTS §7) |
 | Fixing a synchronous 1 GiB journal segment roll, at 1 M commands/s | p99 **105 ms → 23 µs** |
 | Restart: replay a 10 M-command, 800 MB journal | **1.10 s** (11.3 M commands/s); 0.49 s with a snapshot at 9 M |
 | `kill -9` mid-stream | recovered state **byte-identical** to a fresh engine fed the journaled commands |

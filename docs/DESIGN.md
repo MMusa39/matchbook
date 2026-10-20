@@ -178,6 +178,9 @@ makes the journal the engine's outbox: everything Kafka might be missing is re-s
   protocols over TCP (OUCH/BOE-style, or FIX/SBE). Market data goes out over UDP multicast with gap fill
   and snapshot recovery channels. Engine I/O uses kernel bypass (Solarflare/OpenOnload, DPDK), and the
   journal goes over Aeron.
+- **Shard scaling is unproven end to end.** Engine-only scaling is linear to 4 shards, but the full
+  pipeline did not scale past one saturated shard on the laptop (RESULTS §7). It needs re-measuring
+  on a homogeneous-core Linux server with pinned threads before relying on it.
 - **Hardware and OS.** Isolated, pinned cores (`isolcpus`, `nohz_full`), IRQ steering, huge pages,
   turbo off, NUMA-local memory. None of it is possible on the development laptop: this is why the
   laptop's p99.9 and above are dominated by the OS (RESULTS §3).

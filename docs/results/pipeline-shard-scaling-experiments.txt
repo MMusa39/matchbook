@@ -1,0 +1,28 @@
+# Diagnostic runs for the flat pipeline scaling (2026-10-20). Commands and output as run.
+
+## BUSY_SPIN instead of YIELDING (no sched_yield syscalls while waiting)
+# java -Xms4g -Xmx4g -cp engine-bench/target/benchmarks.jar dev.matchbook.bench.ShardScalingBenchmark --shards 1,2 --runs 2 --warmup 3 --duration 8 --wait BUSY_SPIN
+cores=10 wait=BUSY_SPIN warmup=3s duration=8s
+shards=1 run=1 threads=4 total=10.34M cmd/s per-shard=[10342k] cpu=3.44 cores
+shards=1 run=2 threads=4 total=10.11M cmd/s per-shard=[10106k] cpu=3.45 cores
+shards=2 run=1 threads=8 total=7.15M cmd/s per-shard=[2451k,4702k] cpu=6.98 cores
+shards=2 run=2 threads=8 total=8.56M cmd/s per-shard=[3361k,5202k] cpu=7.23 cores
+
+## User vs system time (/usr/bin/time -l), YIELDING
+# /usr/bin/time -l java ... ShardScalingBenchmark --shards N --runs 1 --warmup 2 --duration 8 --wait YIELDING
+shards=1 run=1 threads=4 total=10.78M cmd/s per-shard=[10782k] cpu=3.41 cores
+       10.17 real        32.62 user         2.48 sys
+              517196  page faults
+              975600  involuntary context switches
+shards=2 run=1 threads=8 total=8.19M cmd/s per-shard=[3619k,4574k] cpu=6.92 cores
+       10.18 real        65.06 user         5.12 sys
+              397066  page faults
+             1202862  involuntary context switches
+
+## Small rings (4096 inbound / 4096 outbound slots) to shrink each shard's cache footprint
+# java ... ShardScalingBenchmark --shards 1,2 --runs 2 --warmup 3 --duration 8 --inbound-ring 4096 --outbound-ring 4096
+cores=10 wait=YIELDING warmup=3s duration=8s inboundRing=4096 outboundRing=4096
+shards=1 run=1 threads=4 total=7.58M cmd/s per-shard=[7582k] cpu=3.39 cores
+shards=1 run=2 threads=4 total=9.21M cmd/s per-shard=[9213k] cpu=3.46 cores
+shards=2 run=1 threads=8 total=8.78M cmd/s per-shard=[3727k,5051k] cpu=7.42 cores
+shards=2 run=2 threads=8 total=7.85M cmd/s per-shard=[2906k,4941k] cpu=7.00 cores

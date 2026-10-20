@@ -1,0 +1,71 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/moham/Documents/Projects/matchbook/engine-bench/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.4.1, OpenJDK 64-Bit Server VM, 25.0.4.1
+# VM invoker: /opt/homebrew/Cellar/openjdk@25/25.0.4.1/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms4g -Xmx4g -XX:+AlwaysPreTouch
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 2 s each
+# Measurement: 5 iterations, 2 s each
+# Timeout: 10 min per iteration
+# Threads: 10 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: dev.matchbook.bench.ShardThroughputBenchmark.mixedWorkload
+
+# Run progress: 0.00% complete, ETA 00:00:32
+# Fork: 1 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/moham/Documents/Projects/matchbook/engine-bench/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 157.006 ops/us
+# Warmup Iteration   2: 155.904 ops/us
+# Warmup Iteration   3: 157.579 ops/us
+Iteration   1: 155.750 ops/us
+Iteration   2: 156.542 ops/us
+Iteration   3: 155.336 ops/us
+Iteration   4: 153.784 ops/us
+Iteration   5: 158.803 ops/us
+
+# Run progress: 50.00% complete, ETA 00:00:16
+# Fork: 2 of 2
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/moham/Documents/Projects/matchbook/engine-bench/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 155.808 ops/us
+# Warmup Iteration   2: 159.557 ops/us
+# Warmup Iteration   3: 158.832 ops/us
+Iteration   1: 158.664 ops/us
+Iteration   2: 154.653 ops/us
+Iteration   3: 155.893 ops/us
+Iteration   4: 156.681 ops/us
+Iteration   5: 156.386 ops/us
+
+
+Result "dev.matchbook.bench.ShardThroughputBenchmark.mixedWorkload":
+  156.249 ±(99.9%) 2.389 ops/us [Average]
+  (min, avg, max) = (153.784, 156.249, 158.803), stdev = 1.580
+  CI (99.9%): [153.860, 158.638] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:33
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                Mode  Cnt    Score   Error   Units
+ShardThroughputBenchmark.mixedWorkload  thrpt   10  156.249 ± 2.389  ops/us
+
+Benchmark result is saved to docs/results/jmh-shard-throughput-t10.json

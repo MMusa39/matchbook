@@ -24,6 +24,13 @@ to shards by configuration. Order and trade ids carry the shard id in their top 
 - Determinism comes for free: one thread, one input order, one output order (ADR-0008).
 - Throughput per symbol is bounded by one core. Scaling out means more shards, not more threads per
   book. A single very hot symbol cannot be split.
+- **Measured (RESULTS §7):**
+  - The engine itself scales linearly from 2 to 4 shards (135 M commands/s on 4).
+  - A full pipeline shard at saturation keeps about 4 cores busy (producer, journal, matching,
+    publisher). On the 4-performance-core laptop, a second pipeline shard added CPU but no
+    throughput.
+  - So shards must be provisioned with dedicated cores. The pipeline's end-to-end scaling has not been
+    demonstrated on suitable hardware.
 - Cross-symbol operations (spreads, a portfolio-level risk check inside the engine) would need
   coordination between shards; this project keeps risk in the gateway (ADR-0010).
 

@@ -336,3 +336,81 @@ Every record still gets its `(shard, seq)` dedupe claim inside the transaction. 
 amortises the commit, which is a synchronous fsync on the VM's disk. An earlier, incorrect
 measurement of 143/s came from sampling a consumer that was just finishing its backlog. It is not used
 anywhere.
+
+## 7. Scaling with shards
+
+Matching is single-threaded *per shard* by design (ADR-0001). Throughput is meant to scale by adding
+shards: each one an independent engine, journal and pair of rings, sharing nothing with the others.
+This section measures how far that holds on this machine, at two levels.
+
+### A. The engine alone: share-nothing scaling (JMH)
+
+```bash
+for t in 1 2 4 6 8 10; do java -jar engine-bench/target/benchmarks.jar ShardThroughputBenchmark -t $t; done
+```
+
+Every JMH thread owns its own `MatchingEngine` and its own synthetic order flow (same seed, so every
+shard does identical work), and runs the mixed workload of §2. The score is aggregate throughput
+across threads: 2 forks × 5 iterations of 2 s. Raw: `results/jmh-shard-throughput-t*.txt|json`.
+
+| Shards (threads) | Total M commands/s | ± | Per shard | vs 1 shard |
+|---|---|---|---|---|
+| 1 | **29.0** | 0.3 | 29.0 | 1.00× |
+| 2 | **69.5** | 1.2 | 34.7 | 2.40× |
+| 4 | **135.3** | 1.1 | 33.8 | 4.67× |
+| 6 | **175.9** | 2.1 | 29.3 | 6.08× |
+| 8 | **147.1** | 6.6 | 18.4 | 5.08× |
+| 10 | **156.2** | 2.4 | 15.6 | 5.40× |
+
+- **From 2 to 4 shards, scaling is linear:** 1.95× the throughput for 2× the shards. The engine
+  shares nothing between shards, which is the claim.
+- **Beyond 4,** threads run on the 6 efficiency cores. 6 shards are still +30% over 4; above that the
+  10 cores are oversubscribed (JMH's own threads and the OS included), and throughput falls.
+- **Unexplained:** a single thread scores about 17% lower per thread than 2–4 threads do. I have not
+  established why, and it is reported as measured. My best guess is how macOS schedules a single
+  busy thread on Apple Silicon's clustered cores.
+
+### B. The full pipeline: does not scale on this laptop
+
+```bash
+java -Xms4g -Xmx4g -cp engine-bench/target/benchmarks.jar dev.matchbook.bench.ShardScalingBenchmark \
+     --shards 1,2,4 --runs 3 --warmup 3 --duration 10 --wait YIELDING
+```
+
+**The setup.** Each shard is a complete pipeline: producer thread, inbound ring, journal stage,
+matching stage, outbound ring and one consuming listener. Each has its own journal, takes a snapshot
+every second (keeping one) so journal segments are pruned, and runs closed loop at saturation.
+Raw: [`pipeline-shard-scaling.txt`](results/pipeline-shard-scaling.txt).
+
+| Shards | Busy threads | Total M commands/s, median [range] | Per-shard (median run) | CPU cores |
+|---|---|---|---|---|
+| 1 | 4 | **10.82** [9.87–10.85] | 10820k | 3.4 |
+| 2 | 8 | **9.23** [8.30–9.37] | 3440k,5794k | 7.0 |
+| 4 | 16 | **10.31** [10.29–10.34] | 2256k,2641k,2706k,2712k | 9.4 |
+
+**The result is flat.** One shard saturates at about 10.8 M commands/s using 3.4 cores. Adding shards
+adds CPU (7 and then 9.4 cores) but **no total throughput**: both shards slow down, not just one.
+Three likely causes were tested and ruled out (raw output in
+[`pipeline-shard-scaling-experiments.txt`](results/pipeline-shard-scaling-experiments.txt)):
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| Kernel scheduling pressure from `Thread.yield` | Same run with `BUSY_SPIN` | Still flat, slightly worse (7.2–8.6 M for 2 shards) |
+| Kernel work in the memory-mapped journal (faults, writeback) | `/usr/bin/time -l` user vs system time | System time is small (2.5 s → 5.1 s of ~70 s) and grows only in proportion to user time |
+| Cache footprint of the rings | 4 096-slot rings instead of 16 k / 64 k | No improvement; single-shard throughput dropped |
+
+**Leading hypothesis (not confirmed).** The cause is the machine's heterogeneous cores:
+- One saturated shard keeps 4 threads busy, which exactly fills the cluster of 4 performance cores.
+- A second shard puts threads on the efficiency cluster, so its pipeline runs at the speed of its
+  slowest stage.
+- Every Disruptor hand-off between threads on different clusters then pays cross-cluster
+  cache-coherence latency, which slows both shards.
+
+Confirming this needs either thread pinning, which macOS does not offer (ADR-0009), or a server
+with homogeneous cores, and I had neither.
+
+**What this means for deployment.** A shard at full speed needs about 4 dedicated cores: producer,
+journal, matching and publisher, ideally pinned on one socket. On this laptop that is one shard. On a
+server, shards are sized to the cores available. A real venue also does not run its shards at
+saturation: §3 shows a single shard handles 1 M commands/s with p99 51 µs, and that is the operating
+point that matters.

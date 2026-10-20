@@ -1,0 +1,10 @@
+cores=10 wait=YIELDING warmup=3s duration=10s
+shards=1 run=1 threads=4 total=10.82M cmd/s per-shard=[10820k] cpu=3.41 cores
+shards=1 run=2 threads=4 total=10.85M cmd/s per-shard=[10853k] cpu=3.41 cores
+shards=1 run=3 threads=4 total=9.87M cmd/s per-shard=[9870k] cpu=3.66 cores
+shards=2 run=1 threads=8 total=8.30M cmd/s per-shard=[3603k,4702k] cpu=6.99 cores
+shards=2 run=2 threads=8 total=9.37M cmd/s per-shard=[3444k,5926k] cpu=7.11 cores
+shards=2 run=3 threads=8 total=9.23M cmd/s per-shard=[3440k,5794k] cpu=6.91 cores
+shards=4 run=1 threads=16 total=10.34M cmd/s per-shard=[2184k,2693k,2704k,2755k] cpu=9.47 cores
+shards=4 run=2 threads=16 total=10.29M cmd/s per-shard=[2236k,2686k,2703k,2665k] cpu=9.07 cores
+shards=4 run=3 threads=16 total=10.31M cmd/s per-shard=[2256k,2641k,2706k,2712k] cpu=9.39 cores
