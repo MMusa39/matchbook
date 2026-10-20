@@ -1,0 +1,36 @@
+# Build output
+target/
+*.class
+dependency-reduced-pom.xml
+
+# Maven wrapper downloads
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+*.swp
+.DS_Store
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
+*.local.yml
+*.local.yaml
+
+# Runtime data
+data/
+*.journal
+*.snapshot
+*.hgrm.tmp
+logs/
+*.log
+
+# Claude Code local settings
+.claude/settings.local.json
