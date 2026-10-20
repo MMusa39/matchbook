@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: gateway
+  threads:
+    virtual:
+      enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
+  grpc:
+    server:
+      port: ${GATEWAY_GRPC_PORT:9091}
+
+server:
+  port: ${GATEWAY_HTTP_PORT:8080}
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false   # metrics go to Prometheus; OTLP is used for traces only
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING:1.0}
+    export:
+      enabled: ${OTEL_TRACES_ENABLED:false}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: gateway
+
+matchbook:
+  engine-target: ${ENGINE_TARGET:localhost:9090}
+  engine-timeout: ${ENGINE_TIMEOUT:2s}
+  symbols-file: ${MATCHBOOK_SYMBOLS_FILE:}
+  rate-limit:
+    capacity: ${RATE_LIMIT_CAPACITY:100}
+    refill-per-second: ${RATE_LIMIT_REFILL:50}
+  idempotency-ttl: 24h
+  risk:
+    max-order-quantity: 100000
+    max-notional: 5000000
+    max-position: 500000
+    fat-finger-percent: 10
+  # Client id -> SHA-256 of the API key. Local placeholders only; real deployments inject these as secrets.
+  # Keys: client 1 "local-dev-key-1", client 2 "local-dev-key-2", client 3 "local-dev-key-3".
+  api-keys:
+    1: ${CLIENT_1_KEY_SHA256:f4a371ea0895b3bd1900a2e5d614e8340681bef5e60d79885779d5291a9de065}
+    2: ${CLIENT_2_KEY_SHA256:fd59e0dec717d80efa98dd444cbbc497b02fa7d21964799de445586a9bd3dbe6}
+    3: ${CLIENT_3_KEY_SHA256:c218e938b529e9f41becfea3e2d578de3f9db79489e3d308bc2233fa1861a6d5}
