@@ -15,6 +15,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -41,13 +42,19 @@ public class EngineClient {
     private final CircuitBreaker breaker;
     private final Duration timeout;
 
+    @Autowired
     public EngineClient(GatewayProperties properties, MeterRegistry meters) {
-        this.channel = NettyChannelBuilder.forTarget(properties.engineTarget())
+        this(NettyChannelBuilder.forTarget(properties.engineTarget())
                 .usePlaintext()
                 .keepAliveTime(30, TimeUnit.SECONDS)
-                .build();
+                .build(), properties.engineTimeout(), meters);
+    }
+
+    /** For tests: talk to the engine over a caller-supplied channel. */
+    public EngineClient(ManagedChannel channel, Duration timeout, MeterRegistry meters) {
+        this.channel = channel;
         this.stub = MatchingEngineGrpc.newBlockingStub(channel);
-        this.timeout = properties.engineTimeout();
+        this.timeout = timeout;
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(CircuitBreakerConfig.custom()
                 .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
                 .slidingWindowSize(50)
