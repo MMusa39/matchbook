@@ -1,0 +1,9 @@
+**/target/
+.git/
+.idea/
+.vscode/
+**/*.iml
+docs/results/
+data/
+.claude/
+matching-engine-prompt.md
