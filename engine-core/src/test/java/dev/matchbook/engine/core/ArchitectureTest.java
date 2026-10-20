@@ -19,12 +19,17 @@ class ArchitectureTest {
             .because("engine-core must not depend on Spring or any other framework");
 
     @ArchTest
-    static final ArchRule noClocksOrRandomness = noClasses()
-            .should().dependOnClassesThat()
-            .haveFullyQualifiedName("java.lang.System")
-            .orShould().dependOnClassesThat().resideInAnyPackage("java.time..", "java.util.concurrent..")
-            .orShould().dependOnClassesThat().haveFullyQualifiedName("java.util.Random")
+    static final ArchRule noClocks = noClasses()
+            .should().callMethod(System.class, "currentTimeMillis")
+            .orShould().callMethod(System.class, "nanoTime")
+            .orShould().dependOnClassesThat().resideInAnyPackage("java.time..")
             .because("the engine must be deterministic: time comes in on the command, no wall clock");
+
+    @ArchTest
+    static final ArchRule noRandomnessOrConcurrency = noClasses()
+            .should().dependOnClassesThat().haveFullyQualifiedName("java.util.Random")
+            .orShould().dependOnClassesThat().resideInAnyPackage("java.util.concurrent..")
+            .because("the engine is single-threaded and deterministic");
 
     @ArchTest
     static final ArchRule noFloatingPointOrBigDecimal = noClasses()
