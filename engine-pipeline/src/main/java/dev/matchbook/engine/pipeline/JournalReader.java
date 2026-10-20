@@ -38,7 +38,19 @@ public final class JournalReader {
 
     /** Visits every valid record with a sequence number greater than {@code afterSeq}. */
     public static ScanResult replay(Path directory, long afterSeq, Visitor visitor) {
+        return replay(JournalFormat.segments(directory), afterSeq, visitor);
+    }
+
+    /**
+     * Validates only the newest segment, which is all that is needed to find where the next append goes.
+     * Full validation happens during recovery replay.
+     */
+    public static ScanResult scanTail(Path directory) {
         List<Path> segments = JournalFormat.segments(directory);
+        return replay(segments.isEmpty() ? segments : List.of(segments.getLast()), Long.MAX_VALUE, (s, c) -> { });
+    }
+
+    private static ScanResult replay(List<Path> segments, long afterSeq, Visitor visitor) {
         Command command = new Command();
         CRC32C crc = new CRC32C();
         long lastSeq = 0;

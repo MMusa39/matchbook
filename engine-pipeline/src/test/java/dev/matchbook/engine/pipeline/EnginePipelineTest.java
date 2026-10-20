@@ -158,6 +158,24 @@ class EnginePipelineTest {
     }
 
     @Test
+    void refusesToStartWhenTheMiddleOfTheJournalIsDamaged() throws Exception {
+        PipelineConfig config = PipelineConfig.defaults(ENGINE, dir).withJournalSegmentBytes(64 * 1024);
+        EnginePipeline first = EnginePipeline.start(config, List.of());
+        publish(first, new SyntheticOrderFlow(21, 4096), 1, 5_000);
+        first.snapshot(false).get(10, TimeUnit.SECONDS);
+        first.halt();
+        Path firstSegment = JournalFormat.segments(dir).getFirst();
+        try (java.io.RandomAccessFile file = new java.io.RandomAccessFile(firstSegment.toFile(), "rw")) {
+            file.seek(10L * JournalFormat.RECORD_LENGTH + JournalFormat.HEADER_LENGTH + 16);
+            file.write(0x7F);
+        }
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> EnginePipeline.start(config, List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .rootCause().hasMessageContaining("journal is damaged at seq 11");
+    }
+
+    @Test
     void bookImageIsConsistentWithTheEventStream() throws Exception {
         RecordingListener listener = new RecordingListener();
         try (EnginePipeline pipeline = EnginePipeline.start(PipelineConfig.defaults(ENGINE, dir), List.of(listener))) {

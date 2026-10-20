@@ -87,12 +87,15 @@ public final class EnginePipeline implements AutoCloseable {
         this.engine = new MatchingEngine(config.engine(), sink);
         SnapshotStore store = new SnapshotStore(config.dataDirectory(), config.snapshotsToKeep());
 
+        long snapshotSeqForJournal = store.latest().map(Snapshot::journalSeq).orElse(0L);
+        this.journal = Journal.open(config.dataDirectory(), config.journalSegmentBytes(), config.fsync(),
+                snapshotSeqForJournal).pretouch(config.pretouchJournal());
         // Where the journal ends now; nothing can be appended until start() returns.
-        JournalReader.ScanResult existing = JournalReader.replay(config.dataDirectory(), Long.MAX_VALUE, (q, c) -> { });
+        long journalEnd = journal.lastSeq();
         CompletableFuture<RecoveryInfo> recovered = new CompletableFuture<>();
         MatchingStage.Recovery recovery = () -> {
             try {
-                RecoveryInfo info = recover(store, sink, existing.lastSeq());
+                RecoveryInfo info = recover(store, sink, journalEnd);
                 recovered.complete(info);
                 return info.lastJournalSeq();
             } catch (RuntimeException | Error e) {
@@ -100,9 +103,6 @@ public final class EnginePipeline implements AutoCloseable {
                 throw e;
             }
         };
-        long snapshotSeqForJournal = store.latest().map(Snapshot::journalSeq).orElse(0L);
-        this.journal = Journal.open(config.dataDirectory(), config.journalSegmentBytes(), config.fsync(),
-                snapshotSeqForJournal).pretouch(config.pretouchJournal());
 
         this.snapshotWriter = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "snapshot-writer-" + shard);
@@ -175,6 +175,12 @@ public final class EnginePipeline implements AutoCloseable {
             replayed[0]++;
         });
         long last = Math.max(snapshotSeq, Math.min(scan.lastSeq(), journalEnd));
+        if (last < journalEnd) {
+            // Damage in the middle of the journal: the engine would silently miss commands that the
+            // journal still holds and would append after. Refuse to start; an operator must intervene.
+            throw new IllegalStateException("journal is damaged at seq " + (last + 1)
+                    + " but holds records up to " + journalEnd);
+        }
         return new RecoveryInfo(snapshotSeq, replayed[0], last, scan.torn(), System.nanoTime() - start);
     }
 

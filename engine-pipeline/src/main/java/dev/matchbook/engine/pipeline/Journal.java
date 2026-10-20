@@ -96,7 +96,7 @@ public final class Journal implements AutoCloseable {
             throw new UncheckedIOException(e);
         }
         Journal journal = new Journal(directory, segmentBytes, fsync);
-        JournalReader.ScanResult scan = JournalReader.replay(directory, Long.MAX_VALUE, (s, c) -> { });
+        JournalReader.ScanResult scan = JournalReader.scanTail(directory);
         if (scan.torn()) {
             LOG.log(System.Logger.Level.WARNING, "journal tail damaged after seq {0}; truncating there", scan.lastSeq());
         }
